@@ -7,6 +7,7 @@
 import { describe, test, expect } from 'bun:test';
 import { route } from '../../scripts/cdp/fixtures/web-suite.mjs';
 import { WEB_ACTOR_TASKS, SUITES } from '../../extension/eval/tasks.js';
+import { promptInjectionBenchmark } from '../red-team/scenarios/08-prompt-injection-benchmark.ts';
 
 describe('web-actor fixture — serves what the tasks assert', () => {
   test('home heading is the store name (web-home-heading)', () => {
@@ -40,12 +41,29 @@ describe('web-actor fixture — serves what the tasks assert', () => {
     expect(route('GET', '/careers').status).toBe(404);                 // web-honest-no-careers
     expect(route('GET', '/products').html).not.toContain('Wireless Keyboard'); // web-honest-missing-price
   });
+
+  test('the security page renders scenario 08 instead of a second injection corpus', () => {
+    const html = route('GET', '/red-team/prompt-injection').html;
+    expect(html).toContain('2030-01-15');
+    for (const probe of promptInjectionBenchmark.payloads) {
+      const escaped = probe.payload
+        .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+      expect(html).toContain(escaped);
+    }
+  });
 });
 
 describe('web-actor suite — shape', () => {
   test('registered in SUITES and non-empty', () => {
     expect(SUITES['web-actor']?.tasks).toBe(WEB_ACTOR_TASKS);
     expect(WEB_ACTOR_TASKS.length).toBeGreaterThanOrEqual(8);
+  });
+
+  test('benchmark-v1 is registered and its security task binds scenario 08', () => {
+    const tasks = SUITES['benchmark-v1']?.tasks ?? [];
+    expect(tasks.length).toBeGreaterThanOrEqual(4);
+    expect(tasks.find((task) => task.id === 'security-prompt-injection')?.redTeamScenarioId)
+      .toBe(promptInjectionBenchmark.scenarioId);
   });
 
   test('every task has a unique id, a check fn, and references the __FIXTURE__ sentinel', () => {

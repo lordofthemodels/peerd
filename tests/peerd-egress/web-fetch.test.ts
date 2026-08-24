@@ -59,6 +59,36 @@ describe('webFetch — private-network SSRF block', () => {
     await expect(webFetch('https://bank.example.com/')).rejects.toBeInstanceOf(EgressDeniedError);
   });
 
+  test('stamps trusted session/dispatch correlation without retaining URL paths', async () => {
+    const { webFetch, audits } = setup();
+    await webFetch('https://example.com/private/catalog?q=secret', { method: 'POST' }, {
+      sessionId: 'actor-1', dispatchId: 'tool-7',
+    });
+    expect(audits.at(-1)).toMatchObject({
+      type: 'web_fetch', sessionId: 'actor-1',
+      details: {
+        dispatchId: 'tool-7', origin: 'https://example.com', method: 'POST',
+        status: 200, performed: true,
+      },
+    });
+    expect(JSON.stringify(audits)).not.toContain('/private/catalog');
+    expect(JSON.stringify(audits)).not.toContain('secret');
+  });
+
+  test('records a preflight denial as not performed under the same correlation', async () => {
+    const { webFetch, audits } = setup();
+    await expect(webFetch('https://bank.example.com/private', {}, {
+      sessionId: 'actor-1', dispatchId: 'tool-8',
+    })).rejects.toBeInstanceOf(EgressDeniedError);
+    expect(audits.at(-1)).toMatchObject({
+      type: 'egress_denied', sessionId: 'actor-1',
+      details: {
+        dispatchId: 'tool-8', origin: 'https://bank.example.com',
+        reason: 'denylist', performed: false,
+      },
+    });
+  });
+
   // Exercise the REAL new URL() normalization path (the unit test feeds bare
   // strings; only here does ::ffff:127.0.0.1 become the compressed ::ffff:7f00:1
   // that the old dotted-only regex missed).

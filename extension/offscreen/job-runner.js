@@ -843,7 +843,7 @@ const _runJob = async ({ code, timeoutMs = 30000, startedAt, deadlineAt, a2a = f
           usedEgress = true;   // the run reached the web (its pinned origin) → untrusted bytes
           try {
             const resp = await runCodeOp('site-fetch', m.method ?? 'GET', () => sendToSW('site-fetch/call', {
-              ownerSessionId, runId, siteOrigin: siteFetch,
+              ownerSessionId, ownerToolUseId, runId, siteOrigin: siteFetch,
               pathOrUrl: m.pathOrUrl, method: m.method, headers: m.headers, body: m.body,
             }), (response) => response?.ok === true);
             // The bridge resolves on m.result and rejects on m.error — so the

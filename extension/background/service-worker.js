@@ -5651,8 +5651,8 @@ const appCallRoute = {
 //     same-origin, keyless — identical authority to fetch_url), so this relay adds
 //     nothing the live actor doesn't already have for its own origin.
 const siteFetchCallRoute = {
-  /** @param {{ ownerSessionId?: string, siteOrigin?: string, pathOrUrl?: string, method?: string, headers?: Record<string,string>, body?: unknown, runId?: string }} msg @param {any} sender */
-  'site-fetch/call': async ({ ownerSessionId, siteOrigin, pathOrUrl, method, headers, body, runId } = {}, sender = undefined) => {
+  /** @param {{ ownerSessionId?: string, ownerToolUseId?: string, siteOrigin?: string, pathOrUrl?: string, method?: string, headers?: Record<string,string>, body?: unknown, runId?: string }} msg @param {any} sender */
+  'site-fetch/call': async ({ ownerSessionId, ownerToolUseId, siteOrigin, pathOrUrl, method, headers, body, runId } = {}, sender = undefined) => {
     if (!isOffscreenSender(sender)) return { ok: false, error: 'site_fetch_unauthorized_relay' };
     if (vault.isLocked()) return { ok: false, error: 'locked' };
     if (typeof ownerSessionId !== 'string' || !ownerSessionId) return { ok: false, error: 'site_fetch_no_owner' };
@@ -5792,7 +5792,11 @@ const siteFetchCallRoute = {
     if (!await reauthorizeSiteFetch()) return { ok: false, error: 'site_fetch_cross_origin' };
     if (runSignal?.aborted) return { ok: false, error: 'site_fetch_aborted' };
     try {
-      const res = await scopedFetch(url, { method: httpMethod, headers: safeHeaders, body: /** @type {string|undefined} */ (reqBody), ...(runSignal ? { signal: runSignal } : {}) });
+      const res = await scopedFetch(
+        url,
+        { method: httpMethod, headers: safeHeaders, body: /** @type {string|undefined} */ (reqBody), ...(runSignal ? { signal: runSignal } : {}) },
+        { sessionId: ownerSessionId, dispatchId: ownerToolUseId },
+      );
       const ct = res.headers.get('content-type') ?? '';
       const text = (await res.text()).slice(0, 200_000);   // hard cap on relayed bytes
       let json = null;

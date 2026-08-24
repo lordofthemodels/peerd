@@ -217,6 +217,30 @@ describe('message_actor: target-resolution policy', () => {
 });
 
 describe('message_actor — happy path + correlation', () => {
+  test('audits real actor message and completion boundaries on the actor session', async () => {
+    const audit: any[] = [];
+    const { messageActor } = harness({ appendAudit: async (entry: any) => { audit.push(entry); } });
+    await messageActor({
+      to: 'app-1', message: 'build it', senderSessionId: 'chat-1', toolUseId: 'dispatch-1',
+    });
+    await tick();
+    expect(audit.find((entry) => entry.type === 'actor_message')).toMatchObject({
+      sessionId: 'res-1',
+      details: {
+        actorSessionId: 'res-1', correlationId: 'correlation-1',
+        parentDispatchId: 'dispatch-1', to: 'app-1',
+      },
+    });
+    expect(audit.find((entry) => entry.type === 'actor_completed')).toMatchObject({
+      sessionId: 'res-1',
+      details: {
+        actorSessionId: 'res-1', correlationId: 'correlation-1',
+        parentDispatchId: 'dispatch-1',
+        failed: false, outcomeKnown: true, performed: true, aborted: false,
+      },
+    });
+  });
+
   test('reserves the actor slot before async setup so a second delivery cannot overtake', async () => {
     const slots = makeTurnSlots();
     const started: string[] = [];

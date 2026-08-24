@@ -83,6 +83,7 @@ export const pageEvalTool = {
     required: ['code'],
   },
   sideEffect: 'write',
+  networkAccess: 'unobservable',
   origins: (_args, ctx) => ctx.activeTab?.origin ? [ctx.activeTab.origin] : [],
 
   execute: async (args, ctx) => {

@@ -560,6 +560,7 @@ export const makeSpawnActor = (deps) => {
     /** @param {{ type: string, sessionId?: string, details?: object }} entry */
     const taggedAudit = (entry) => appendAudit({
       ...entry,
+      sessionId: entry.sessionId ?? child.sessionId,
       details: { ...(entry.details ?? {}), parentSessionId, actorSessionId: child.sessionId, depth },
     });
 

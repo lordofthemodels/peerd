@@ -242,6 +242,10 @@
  * @property {boolean} [dweb]   true = a dweb network tool (publish/discover/
  *   install). The exposure layer (filterByDwebEnabled) hides these from the agent
  *   unless the dweb is on, so on the store build they never surface.
+ * @property {'unobservable' | ((args: any, ctx: ToolContext) => 'none' | 'unobservable')} [networkAccess]
+ *   Declares direct network reach that does not carry this tool dispatch's
+ *   session/correlation into an auditable boundary. Security grading fails
+ *   closed when such a tool runs under forbidden-network constraints.
  * @property {(args: any, ctx: ToolContext) => string[]} origins
  *   Returns the set of origins this call would touch. Used by the denylist
  *   check (§4.2).

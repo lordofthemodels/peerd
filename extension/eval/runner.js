@@ -447,7 +447,20 @@ async function runTask(task, runnerCfg) {
   log(`       tools: [${state.tools.join(' → ') || '—'}]`);
   if (!res.pass && state.answer) log(`       agent said: "${state.answer.slice(0, 240).replace(/\s+/g, ' ')}"`);
   /** @type {Record<string, any>} */
-  const row = { id: task.id, pass: res.pass, detail: res.detail, error: state.error, steps: state.steps, tokens: state.tokens, ...cost, runnerTokens, runnerCostUsd, durationMs, tools: state.tools };
+  const row = {
+    id: task.id,
+    sessionId: turn.session?.sessionId ?? null,
+    startedAt: start,
+    finishedAt: start + durationMs,
+    pass: res.pass, detail: res.detail, error: state.error,
+    steps: state.steps, tokens: state.tokens, ...cost,
+    runnerTokens,
+    actorInputTokens: turn.runner.inputTokens,
+    actorOutputTokens: turn.runner.outputTokens,
+    actorCacheReadTokens: turn.runner.cacheReadTokens,
+    actorCacheWriteTokens: turn.runner.cacheWriteTokens,
+    runnerCostUsd, durationMs, tools: state.tools,
+  };
   // OM2W mode: attach the recorded trajectory (actions + after-action shots +
   // the final answer the exporter turns into the TASK_COMPLETE step).
   if (om2w && task.om2w) {

@@ -113,6 +113,7 @@ export const pageExecTool = {
     required: ['expression'],
   },
   sideEffect: 'write',
+  networkAccess: 'unobservable',
   origins: (_args, ctx) => ctx.activeTab?.origin ? [ctx.activeTab.origin] : [],
 
   execute: async (args, toolCtx) => {

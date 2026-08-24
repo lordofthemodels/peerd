@@ -162,7 +162,7 @@ throw new Error('unrelated failure');`,
       { sendToSW },
     );
     const siteRun = runJob(
-      { code: 'return await site.fetch("/x");', siteFetch: 'https://site.example', ownerSessionId: 'api-1', runId: 'site-relay-1', timeoutMs: 5000 },
+      { code: 'return await site.fetch("/x");', siteFetch: 'https://site.example', ownerSessionId: 'api-1', ownerToolUseId: 'site-tool-1', runId: 'site-relay-1', timeoutMs: 5000 },
       { sendToSW },
     );
     await started;

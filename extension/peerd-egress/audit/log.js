@@ -164,27 +164,29 @@ export const createAuditLog = ({ idb, now = Date.now, makeId, maxEntries, pruneC
     return job;
   };
 
+  // why one queued snapshot: callers that list(), then verify(), can observe
+  // different log generations between those reads. AET needs the exact rows
+  // whose verification it carries, after every fire-and-forget append ahead of
+  // it has committed.
+  const snapshot = async () => {
+    const readSnapshot = async () => {
+      const entries = await idb.getAll(STORE);
+      let head = null;
+      try { head = await idb.get?.(META_STORE, CHAIN_HEAD_KEY) ?? null; } catch { head = null; }
+      return { entries, verification: await verifyChain(entries, head) };
+    };
+    const job = writeQueue.then(readSnapshot);
+    writeQueue = job.catch(() => {});
+    return job;
+  };
+
   /**
    * Verify the retained log against its hash chain + head record.
    * ok=false means a DETECTED inconsistency (rewrite, deletion,
    * truncation); pre-chain legacy entries report as `unchained`, not
    * failures. Read-only.
    */
-  const verify = async () => {
-    // why through the queue: reading entries then head OUTSIDE the append
-    // serialization can catch an append mid-flight (head one entry ahead of
-    // the last getAll row) → a false "truncated tail" stamped into the debug
-    // bundle. Draining the queue first gives a consistent snapshot.
-    const readSnapshot = async () => {
-      const entries = await idb.getAll(STORE);
-      let head = null;
-      try { head = await idb.get?.(META_STORE, CHAIN_HEAD_KEY) ?? null; } catch { head = null; }
-      return verifyChain(entries, head);
-    };
-    const job = writeQueue.then(readSnapshot);
-    writeQueue = job.catch(() => {});
-    return job;
-  };
+  const verify = async () => (await snapshot()).verification;
 
   /**
    * Read all retained entries. Returns them in insertion order (UUIDv7
@@ -193,5 +195,5 @@ export const createAuditLog = ({ idb, now = Date.now, makeId, maxEntries, pruneC
    */
   const list = () => idb.getAll(STORE);
 
-  return Object.freeze({ append, list, verify });
+  return Object.freeze({ append, list, verify, snapshot });
 };

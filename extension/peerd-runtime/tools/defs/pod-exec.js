@@ -49,6 +49,7 @@ export const podExecTool = {
     required: ['command'],
   },
   sideEffect: 'write',
+  networkAccess: 'unobservable',
   retryClass: 'E',
   origins: (args) => {
     const matches = String(args?.command ?? '').match(/https:\/\/[^\s'"<>|]+/g) ?? [];

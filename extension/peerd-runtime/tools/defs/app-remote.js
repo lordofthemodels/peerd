@@ -26,6 +26,7 @@ export const repositoryRemoteTool = {
     required: ['op'],
   },
   sideEffect: 'write',
+  networkAccess: (args) => args?.op === 'fetch' || args?.op === 'push' ? 'unobservable' : 'none',
   origins: (args) => {
     if (typeof args?.url !== 'string') return [];
     try { return [new URL(args.url).origin]; } catch { return []; }

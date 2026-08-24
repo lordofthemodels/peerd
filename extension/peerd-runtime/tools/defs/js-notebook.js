@@ -71,6 +71,7 @@ export const jsNotebookTool = {
     required: ['code'],
   },
   sideEffect: 'write',
+  networkAccess: 'unobservable',
   origins: () => [],
 
   execute: async (args, ctx) => {

@@ -10,6 +10,7 @@ describe('site_client_run code-run custody', () => {
       origin: 'https://api.example.com', code: 'return await client.list()',
     }, {
       session: { sessionId: 'api-actor-1' },
+      toolUseId: 'site-tool-1',
       canUseSiteClientOrigin: () => true,
       authorizeSiteClientOrigin: async () => true,
       siteClients: {
@@ -30,7 +31,10 @@ describe('site_client_run code-run custody', () => {
     } as any);
     expect(result.ok).toBe(true);
     expect(registered).toEqual(['site-run-1', undefined, 'api-actor-1', { site: true }]);
-    expect(options).toMatchObject({ runId: 'site-run-1', ownerSessionId: 'api-actor-1', siteFetch: 'https://api.example.com' });
+    expect(options).toMatchObject({
+      runId: 'site-run-1', ownerSessionId: 'api-actor-1',
+      ownerToolUseId: 'site-tool-1', siteFetch: 'https://api.example.com',
+    });
     expect(released).toBe('site-run-1');
   });
 

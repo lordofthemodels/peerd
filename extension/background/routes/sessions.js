@@ -327,15 +327,16 @@ export const makeSessionRoutes = (deps) => {
       const childSessions = (await Promise.all(childIds.map((/** @type {string} */ id) => sessions.get(id))))
         .filter(Boolean);
       const idSet = new Set([sessionId, ...childIds]);
-      const auditEntries = (await auditLog.list())
+      // why one read: it drains pending appends and verifies those exact rows.
+      const auditSnapshot = await auditLog.snapshot();
+      const auditEntries = auditSnapshot.entries
         .filter((/** @type {any} */ e) => e.sessionId && idSet.has(e.sessionId));
       const settings = settingsStore.get();
-      // R4: the bundle's audit slice is a checkable artifact — run the hash
-      // chain verification and stamp the result into provenance.
-      const auditChain = await (auditLog.verify?.().catch(() => null)) ?? null;
+      const auditChain = auditSnapshot.verification;
       const bundle = assembleDebugBundle({
         session, childSessions, auditEntries, settings, auditChain,
         contextSnapshots: contextSnapshots.snapshotsForMany([sessionId, ...childIds]),
+        contextSnapshotCoverage: contextSnapshots.coverageForMany([sessionId, ...childIds]),
         channel: CHANNEL,
         appVersion: browser.runtime.getManifest?.().version ?? 'unknown',
         now: Date.now(),

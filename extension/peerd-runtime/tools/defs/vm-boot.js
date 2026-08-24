@@ -81,6 +81,7 @@ export const vmBootTool = {
     required: ['cmd'],
   },
   sideEffect: 'write',
+  networkAccess: 'unobservable',
   origins: () => [],
 
   execute: async (args, ctx) => {

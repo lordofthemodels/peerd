@@ -57,7 +57,7 @@ describe('site-client custody service-worker wiring', () => {
 
     const custody = route.indexOf('const reauthorizeSiteFetch = () => authorizeSiteClientRelayOrigin({');
     const confirmation = route.indexOf('needsWebWriteConfirm(httpMethod)');
-    const fetch = route.indexOf('await scopedFetch(url');
+    const fetch = route.indexOf('await scopedFetch(');
     expect(custody).toBeGreaterThan(-1);
     expect(custody).toBeLessThan(confirmation);
     expect(custody).toBeLessThan(fetch);
@@ -70,6 +70,7 @@ describe('site-client custody service-worker wiring', () => {
     expect(route).toContain('if (isKnownIdpHost(pin))');
     expect(route).toContain("const relayBacking = owner.backing === undefined ? 'tab' : owner.backing");
     expect(route).not.toContain("owner.backing ?? 'tab'");
+    expect(route).toContain('{ sessionId: ownerSessionId, dispatchId: ownerToolUseId }');
   });
 
   test('mint-time dossier injection checks durable/live custody on both sides of IDB', () => {
