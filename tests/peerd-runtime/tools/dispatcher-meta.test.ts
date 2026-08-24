@@ -42,6 +42,48 @@ const baseTool = (over: any = {}) => ({
 afterEach(() => clearTools());
 
 describe('dispatcher lineage spine fields', () => {
+  test('an unknown tool is a session-scoped audited capability attempt', async () => {
+    const { ctx: rctx, audited } = recorderCtx();
+    const result: any = await dispatchToolCall({ id: 'forged-1', name: 'missing_tool', args: {} } as any, rctx);
+    await Promise.resolve();
+    expect(result).toMatchObject({ ok: false, error: 'unknown_tool: missing_tool' });
+    expect(audited).toContainEqual({
+      type: 'tool_blocked', sessionId: 's',
+      details: {
+        tool: 'missing_tool', dispatchId: 'forged-1', primitive: 'unknown',
+        dispatch: null, sideEffect: 'unknown', origins: [],
+        gate: 'registry', reason: 'unknown_tool',
+      },
+    });
+  });
+
+  test('the per-dispatch webFetch wrapper adds trusted audit correlation', async () => {
+    const calls: any[] = [];
+    registerTool(baseTool({
+      execute: async (_args: any, execCtx: any) => {
+        await execCtx.webFetch('https://example.com/private');
+        return { ok: true };
+      },
+    }) as any);
+    await dispatchToolCall({ id: 'fetch-1', name: 'lt', args: {} } as any, {
+      ...ctx,
+      webFetch: async (...args: any[]) => { calls.push(args); return new Response('ok'); },
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0][2]).toEqual({ sessionId: 's', dispatchId: 'fetch-1' });
+  });
+
+  test('audit resolves descriptor-declared unobservable network reach', async () => {
+    registerTool(baseTool({
+      networkAccess: (args: any) => args.remote === true ? 'unobservable' : 'none',
+    }) as any);
+    const { ctx: rctx, audited } = recorderCtx();
+    await dispatchToolCall({ id: 'network-1', name: 'lt', args: { remote: true } } as any, rctx);
+    await Promise.resolve();
+    expect(audited.find((entry) => entry.type === 'tool_executed')?.details)
+      .toMatchObject({ dispatchId: 'network-1', networkAccess: 'unobservable' });
+  });
+
   test('success: sideEffect + origins on meta', async () => {
     registerTool(baseTool() as any);
     const r: any = await dispatchToolCall({ id: 't1', name: 'lt', args: {} } as any, ctx);
@@ -132,7 +174,7 @@ describe('dispatcher lineage spine fields', () => {
     expect(failed).toBeTruthy();
     expect(audited.some((e) => e.type === 'tool_executed')).toBe(false);
     expect(failed.details.primitive).toBe('web');
-    expect(failed.details.error).toBe('declined');
+    expect(failed.details.error).toBe('tool_failed');
     expect(typeof failed.details.durationMs).toBe('number');
   });
 
@@ -187,7 +229,13 @@ describe('dispatcher lineage spine fields', () => {
     const { ctx: rctx, audited } = recorderCtx();
     await dispatchToolCall({ id: 't5', name: 'lt', args: {} } as any, rctx);
     await Promise.resolve();
-    expect(audited.some((e) => e.type === 'tool_executed')).toBe(true);
+    expect(audited.find((e) => e.type === 'tool_executed')).toMatchObject({
+      sessionId: 's',
+      details: {
+        tool: 'lt', dispatchId: 't5', primitive: 'web', sideEffect: 'read',
+        origins: ['https://example.com'],
+      },
+    });
     expect(audited.some((e) => e.type === 'tool_failed')).toBe(false);
   });
 
@@ -202,8 +250,32 @@ describe('dispatcher lineage spine fields', () => {
     const failed = audited.find((e) => e.type === 'tool_failed');
     expect(failed).toBeTruthy();
     expect(failed.details.primitive).toBe('web');
-    expect(failed.details.error).toBe('boom');
+    expect(failed.details.error).toBe('tool_failed');
     expect(typeof failed.details.durationMs).toBe('number');
+  });
+
+  test('arbitrary thrown text cannot leak into the audit log', async () => {
+    registerTool(baseTool({
+      execute: async () => { throw new Error('request failed at https://private.example/account?token=secret'); },
+    }) as any);
+    const { ctx: rctx, audited } = recorderCtx();
+    await dispatchToolCall({ id: 'private-error', name: 'lt', args: {} } as any, rctx);
+    await Promise.resolve();
+    const serialized = JSON.stringify(audited);
+    expect(audited.find((entry) => entry.type === 'tool_failed')?.details.error).toBe('tool_failed');
+    expect(serialized).not.toContain('private.example');
+    expect(serialized).not.toContain('secret');
+  });
+
+  test('a secret-shaped returned error cannot masquerade as an audit code', async () => {
+    registerTool(baseTool({
+      execute: async () => ({ ok: false, error: 'sk-proj-secretvalue' }),
+    }) as any);
+    const { ctx: rctx, audited } = recorderCtx();
+    await dispatchToolCall({ id: 'secret-code', name: 'lt', args: {} } as any, rctx);
+    await Promise.resolve();
+    expect(audited.find((entry) => entry.type === 'tool_failed')?.details.error).toBe('tool_failed');
+    expect(JSON.stringify(audited)).not.toContain('sk-proj-secretvalue');
   });
 
   test('paged survives the {...result, meta} enrichment spread (the loop reads it)', async () => {

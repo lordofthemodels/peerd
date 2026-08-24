@@ -133,6 +133,7 @@ export const aggregateFailures = (sessions) => {
  * @param {Array<Record<string, any>>} [input.auditEntries]   the audit slice, already filtered to these sessions
  * @param {Record<string, any>} [input.settings]       the merged secret-free settings snapshot
  * @param {Array<Record<string, any>>} [input.contextSnapshots]  live model-request snapshots for these sessions
+ * @param {Array<{ sessionId: string, total: number, included: number, dropped: number, available: boolean }>} [input.contextSnapshotCoverage]
  * @param {string} [input.channel]
  * @param {string} [input.appVersion]
  * @param {number} input.now
@@ -142,7 +143,7 @@ export const aggregateFailures = (sessions) => {
  */
 export const assembleDebugBundle = ({
   session, childSessions = [], auditEntries = [], settings = {},
-  contextSnapshots = [], channel, appVersion, now, limits = {}, auditChain = null,
+  contextSnapshots = [], contextSnapshotCoverage = [], channel, appVersion, now, limits = {}, auditChain = null,
 }) => {
   const children = childSessions.slice(0, BUNDLE_MAX_CHILD_SESSIONS);
   const audit = auditEntries.slice(-BUNDLE_MAX_AUDIT_ENTRIES);
@@ -175,6 +176,25 @@ export const assembleDebugBundle = ({
     failures,
     audit,
     contextSnapshots,
+    coverage: {
+      childSessions: {
+        total: childSessions.length,
+        included: children.length,
+        truncated: childSessions.length > children.length,
+      },
+      audit: {
+        total: auditEntries.length,
+        included: audit.length,
+        truncated: auditEntries.length > audit.length,
+      },
+      contextSnapshots: {
+        total: contextSnapshotCoverage.reduce((sum, entry) => sum + entry.total, 0),
+        included: contextSnapshots.length,
+        dropped: contextSnapshotCoverage.reduce((sum, entry) => sum + entry.dropped, 0),
+        truncated: contextSnapshotCoverage.some((entry) => entry.dropped > 0),
+        sessions: contextSnapshotCoverage,
+      },
+    },
     settings,
     provenance: {
       // why: honesty over implication — a reader must know what absence means.

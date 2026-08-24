@@ -173,6 +173,7 @@ describe('assembleDebugBundle', () => {
     auditEntries: [{ id: 'e1', when: 1500, type: 'tool_executed', sessionId: SESSION.sessionId }],
     settings: { providerName: 'anthropic', devMode: true },
     contextSnapshots: [{ sessionId: SESSION.sessionId, label: 'main', when: 1900 }],
+    contextSnapshotCoverage: [{ sessionId: SESSION.sessionId, total: 1, included: 1, dropped: 0, available: true }],
     channel: 'preview', appVersion: '0.2.4', now: 10_000,
     limits: { auditMaxEntries: 20_000, snapshotsPerSession: 10 },
   });
@@ -203,6 +204,16 @@ describe('assembleDebugBundle', () => {
     expect(many.audit[0].id).toBe('e10'); // oldest dropped, newest kept
     expect(many.childSessions.length).toBe(BUNDLE_MAX_CHILD_SESSIONS);
     expect(many.provenance.childSessions).toContain('clamped');
+    expect(many.coverage.childSessions).toMatchObject({
+      total: BUNDLE_MAX_CHILD_SESSIONS + 5,
+      included: BUNDLE_MAX_CHILD_SESSIONS,
+      truncated: true,
+    });
+    expect(many.coverage.audit).toMatchObject({
+      total: BUNDLE_MAX_AUDIT_ENTRIES + 10,
+      included: BUNDLE_MAX_AUDIT_ENTRIES,
+      truncated: true,
+    });
   });
 
   test('normalizes a missing/corrupt cost tally instead of exporting garbage', () => {

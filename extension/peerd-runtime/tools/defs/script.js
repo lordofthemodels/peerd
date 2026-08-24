@@ -115,6 +115,7 @@ export const scriptTool = {
     required: ['code'],
   },
   sideEffect: 'write',
+  networkAccess: 'unobservable',
   origins: () => [],
 
   execute: async (args, ctx) => {

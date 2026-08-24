@@ -58,4 +58,12 @@ describe('withSessionScopedCredentials — the boundary owns the decision', () =
     expect(calls[0].credentials).toBe('omit');   // boundary wins
     expect(calls[0].method).toBe('GET');         // other init preserved
   });
+
+  test('forwards host-only audit correlation through the credential wrapper', async () => {
+    const calls: any[] = [];
+    const inner = async (...args: any[]) => { calls.push(args); return {} as any; };
+    const fetchFn = withSessionScopedCredentials(inner, () => 'https://app.example.com');
+    await fetchFn('https://app.example.com/api', {}, { sessionId: 'actor-1', dispatchId: 'tool-1' });
+    expect(calls[0][2]).toEqual({ sessionId: 'actor-1', dispatchId: 'tool-1' });
+  });
 });

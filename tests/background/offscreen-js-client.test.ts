@@ -77,4 +77,20 @@ describe('offscreen JS client', () => {
     expect(sent.deadlineAt - sent.startedAt).toBe(1_234);
     expect(sent.timeoutMs).toBe(1_234);
   });
+
+  test('site-client jobs preserve the trusted tool-use correlation', async () => {
+    let sent: any = null;
+    const client = makeOffscreenJsClient({
+      ensureOffscreen: async () => {},
+      sendMessage: async (message: object) => { sent = message; return { ok: true, result: {} }; },
+    });
+    await client.execHeadless('return site.fetch("/x")', {
+      siteFetch: 'https://site.example', ownerSessionId: 'actor-1',
+      ownerToolUseId: 'site-tool-1', runId: 'site-run-1',
+    });
+    expect(sent).toMatchObject({
+      siteFetch: 'https://site.example', ownerSessionId: 'actor-1',
+      ownerToolUseId: 'site-tool-1', runId: 'site-run-1',
+    });
+  });
 });

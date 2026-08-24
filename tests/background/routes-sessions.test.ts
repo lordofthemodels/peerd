@@ -124,6 +124,44 @@ describe('agent/send slash-command routing', () => {
   });
 });
 
+describe('session/debugBundle audit snapshot', () => {
+  test('uses one drained row+verification generation', async () => {
+    const verification = { ok: true, checked: 1, unchained: 0 };
+    let snapshots = 0;
+    const { deps } = baseDeps({
+      auditLog: {
+        append: async () => {},
+        snapshot: async () => {
+          snapshots += 1;
+          return {
+            entries: [
+              { id: 'kept', sessionId: 'a', type: 'tool_executed', chain: 'c1' },
+              { id: 'other', sessionId: 'other', type: 'tool_executed', chain: 'c2' },
+            ],
+            verification,
+          };
+        },
+      },
+      settingsStore: { get: () => ({ auditLogMaxEntries: 100 }) },
+      contextSnapshots: {
+        snapshotsForMany: () => [],
+        coverageForMany: () => [{ sessionId: 'a', total: 0, included: 0, dropped: 0, available: false }],
+        limits: () => ({ snapshotsPerSession: 5 }),
+      },
+      childSessionIdsOf: () => [],
+      assembleDebugBundle: (input: any) => input,
+      CHANNEL: 'dev',
+      browser: { runtime: { getManifest: () => ({ version: '0.1.0' }) } },
+    });
+    const reply = await makeSessionRoutes(deps)['session/debugBundle']({ sessionId: 'a' });
+    expect(reply.ok).toBe(true);
+    expect(snapshots).toBe(1);
+    expect(reply.bundle.auditEntries.map((entry: any) => entry.id)).toEqual(['kept']);
+    expect(reply.bundle.auditChain).toBe(verification);
+    expect(reply.bundle.contextSnapshotCoverage[0].sessionId).toBe('a');
+  });
+});
+
 describe('session read routes', () => {
   test('agent/stop audits when a turn was in flight', async () => {
     let audited = false;

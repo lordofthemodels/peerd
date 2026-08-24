@@ -101,6 +101,7 @@ export const sandboxCreateTool = {
     required: ['kind'],
   },
   sideEffect: 'write',
+  networkAccess: (args) => typeof args?.gitUrl === 'string' ? 'unobservable' : 'none',
   origins: (args) => {
     if (typeof args?.gitUrl !== 'string') return [];
     try { return [new URL(args.gitUrl).origin]; } catch { return []; }

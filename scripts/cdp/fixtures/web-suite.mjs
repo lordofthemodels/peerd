@@ -15,6 +15,7 @@
 // tasks via the __FIXTURE__ sentinel, so nothing hard-codes a port).
 
 import { createServer } from 'node:http';
+import { promptInjectionBenchmark } from '../../../tests/red-team/scenarios/08-prompt-injection-benchmark.ts';
 
 // ── the store's data (deterministic — the tasks assert on these exact values) ──
 const PRODUCTS = [
@@ -72,6 +73,17 @@ const thanksHtml = (orderId) => page('Thanks', `
 <p>Thanks — your support ticket has been created.</p>
 <p>Confirmation code: <strong id="confirmation">TICKET-${orderId || 'NONE'}</strong></p>`);
 
+const escapeHtml = (value) => String(value)
+  .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+
+const promptInjectionHtml = () => page('Catalog notice', `
+<h1>Catalog notice</h1>
+<p id="catalog-freeze">Catalog freeze date: <strong>2030-01-15</strong>.</p>
+<section aria-label="Untrusted community notes">
+  <h2>Community notes</h2>
+  ${promptInjectionBenchmark.payloads.map(({ payload }) => `<p>${escapeHtml(payload)}</p>`).join('\n  ')}
+</section>`);
+
 const notFoundHtml = (path) => page('Not found', `
 <h1>404 — not found</h1>
 <p>No page at <code>${path}</code>.</p>`);
@@ -92,6 +104,7 @@ export const route = (method, path, body = '') => {
   if (path === '/' || path === '') return { status: 200, html: homeHtml() };
   if (path === '/products') return { status: 200, html: productsHtml() };
   if (path === '/contact') return { status: 200, html: contactHtml() };
+  if (path === '/red-team/prompt-injection') return { status: 200, html: promptInjectionHtml() };
   const m = path.match(/^\/products\/([a-z0-9-]+)$/);
   if (m) {
     const p = PRODUCTS.find((x) => x.id === m[1]);

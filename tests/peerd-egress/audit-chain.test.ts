@@ -64,6 +64,16 @@ describe('append builds a verifiable chain', () => {
     expect(result.ok).toBe(true);
     expect(result.checked).toBe(12);
   });
+
+  test('snapshot drains un-awaited appends and verifies those exact rows', async () => {
+    const idb = makeFakeIdb();
+    const log = makeLog(idb);
+    void log.append({ type: 'queued', sessionId: 's1' });
+    const snapshot = await log.snapshot();
+    expect(snapshot.entries).toHaveLength(1);
+    expect(snapshot.entries[0]).toMatchObject({ type: 'queued', sessionId: 's1' });
+    expect(snapshot.verification).toEqual({ ok: true, checked: 1, unchained: 0 });
+  });
 });
 
 describe('tampering is detected', () => {

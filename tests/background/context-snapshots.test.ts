@@ -84,6 +84,10 @@ describe('createContextSnapshots — the ring', () => {
     expect(snaps.length).toBe(SNAPSHOTS_PER_SESSION);
     expect(snaps[0].messages[0].content).toBe('call 3');           // 0..2 evicted
     expect(snaps.at(-1)!.messages[0].content).toBe(`call ${SNAPSHOTS_PER_SESSION + 2}`);
+    expect(ring.coverageForMany(['s1'])).toEqual([{
+      sessionId: 's1', total: SNAPSHOTS_PER_SESSION + 3,
+      included: SNAPSHOTS_PER_SESSION, dropped: 3, available: true,
+    }]);
   });
 
   test('evicts the oldest-touched session when the session cap is hit', () => {
@@ -94,6 +98,7 @@ describe('createContextSnapshots — the ring', () => {
     ring.record({ sessionId: 'new', messages: [] });
     expect(ring._size()).toBe(2);
     expect(ring.snapshotsFor('old')).toEqual([]);
+    expect(ring.coverageForMany(['old'])[0]).toMatchObject({ included: 0, available: false });
     expect(ring.snapshotsFor('new').length).toBe(1);
   });
 

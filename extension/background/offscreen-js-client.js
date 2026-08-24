@@ -108,7 +108,7 @@ export const makeOffscreenJsClient = ({ ensureOffscreen, sendMessage }) => ({
       ...(actors ? { actors: true, ownerSessionId, ownerToolUseId } : {}),
       // DESIGN-19: a site-client run — the pinned origin + its owner ride as trusted
       // job params; job-runner forces every other cap off.
-      ...(siteFetch ? { siteFetch, ownerSessionId } : {}),
+      ...(siteFetch ? { siteFetch, ownerSessionId, ownerToolUseId } : {}),
       // design 06: the script lane's toolbox-resolution flag (trusted job param).
       ...(toolbox ? { toolbox: true } : {}),
       ...(caps ? { caps, ownerSessionId } : {}),

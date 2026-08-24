@@ -1,25 +1,7 @@
 // @ts-check
-// background/context-snapshots.js — the context inspector's capture ring.
-//
-// "What did the model actually see?" — per model call, a SHAPED snapshot
-// of the request args (system, messages, tools, params) is recorded into
-// a per-session capped ring. Three SW seams feed it and together cover
-// every model call peerd makes: the turn driver's failover wrapper for the
-// orchestrator and the 'actor/model-call' relay route for every isolated actor
-// heap. Held in SW
-// memory only, with the same lifetime posture as
-// the script-runs op mirror — so it answers "what just happened", not
-// "what happened last week"; the debug bundle exports whatever is live
-// and its provenance says exactly that.
-//
-// Secrets: none can appear. The captured args are the PRE-WIRE callModel
-// args; API keys attach at fetch-header time inside the adapter and are
-// never part of the args struct. Size is the real risk (a vision turn
-// carries megabytes of base64), so shaping clips every string and drops
-// binary payloads with a visible sentinel — the "keep metadata, drop
-// bytes" posture the transcript's own redaction already uses.
-//
-// Pure factory (values + injected clock) — bun-tested without a browser.
+// background/context-snapshots.js: bounded, in-memory model-request evidence.
+// Captures pre-wire args only: secrets never enter; strings are clipped and
+// binary payloads dropped. Coverage counters make ring eviction explicit.
 
 export const SNAPSHOTS_PER_SESSION = 10;
 export const SNAPSHOT_MAX_SESSIONS = 24;
@@ -92,7 +74,7 @@ export const createContextSnapshots = ({
   maxSessions = SNAPSHOT_MAX_SESSIONS,
   now = Date.now,
 } = {}) => {
-  /** @type {Map<string, { touched: number, snaps: Array<Record<string, any>> }>} */
+  /** @type {Map<string, { touched: number, total: number, dropped: number, snaps: Array<Record<string, any>> }>} */
   const bySession = new Map();
   let seq = 0;
 
@@ -120,9 +102,13 @@ export const createContextSnapshots = ({
       try {
         const sessionId = call.sessionId;
         if (!sessionId) return;
-        const entry = bySession.get(sessionId) ?? { touched: 0, snaps: [] };
+        const entry = bySession.get(sessionId) ?? { touched: 0, total: 0, dropped: 0, snaps: [] };
         entry.touched = now();
-        if (entry.snaps.length >= capPerSession) entry.snaps.shift();
+        entry.total += 1;
+        if (entry.snaps.length >= capPerSession) {
+          entry.snaps.shift();
+          entry.dropped += 1;
+        }
         entry.snaps.push({
           seq: ++seq,
           when: now(),
@@ -143,6 +129,18 @@ export const createContextSnapshots = ({
       .flatMap((id) => bySession.get(id)?.snaps ?? [])
       .sort((a, b) => a.seq - b.seq)
       .map((s) => ({ ...s })),
+
+    /** @param {string[]} sessionIds */
+    coverageForMany: (sessionIds) => sessionIds.map((sessionId) => {
+      const entry = bySession.get(sessionId);
+      return {
+        sessionId,
+        total: entry?.total ?? 0,
+        included: entry?.snaps.length ?? 0,
+        dropped: entry?.dropped ?? 0,
+        available: !!entry,
+      };
+    }),
 
     /** The caps in force — the bundle's provenance block reports them. */
     limits: () => ({ snapshotsPerSession: capPerSession, maxSessions }),

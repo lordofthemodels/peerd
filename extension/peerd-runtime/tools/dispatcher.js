@@ -1,17 +1,6 @@
 // @ts-check
-// Tool dispatcher.
-//
-// The dispatcher composes the six gates (gates.js) in order, audits the
-// result, and returns a ToolResult with a `meta` field that carries the
-// full gate chain + primitive + duration. That meta is what the
-// side-panel reads to render the lineage display by default — every
-// tool call shows what kind of thing it is and which gates it passed.
-//
-// Architectural property worth stating: tools don't return meta. The
-// dispatcher attaches it. Tool authors only worry about correctness;
-// the rendering and audit story is taken care of around them. This is
-// the same DI / functional-core / imperative-shell pattern we use
-// everywhere else.
+// Tool dispatcher: composes gates in order, audits the boundary result, and
+// attaches lineage meta. Tools never author that enforcement metadata.
 
 import { getTool } from './registry.js';
 import { GATES } from './gates.js';
@@ -28,9 +17,7 @@ import {
   DEFAULT_CONFIRM_ACTIONS,
   normalizeMode,
 } from '../permissions/index.js';
-// The lifecycle classifier — pure, no IO. Used ONLY by the fail-closed
-// backstop below, so the dispatcher never has to duplicate (and drift
-// from) the retry-class taxonomy.
+// why reuse the pure classifier: the backstop must not drift from retry policy.
 import { retryClassForTool } from '../lifecycle/tool-retry-class.js';
 import { RETRY_CLASSES } from '../lifecycle/retry-class.js';
 import { FAILURE_OUTCOMES } from '../lifecycle/failure-taxonomy.js';
@@ -330,8 +317,25 @@ const liveTabUrl = async (ctx) => {
  * @returns {Promise<ToolResult>}
  */
 export const dispatchToolCall = async (call, ctx) => {
+  // why here: even unknown calls need trusted session attribution.
+  /** @param {{ type: string, sessionId?: string, details?: Record<string, any> }} entry */
+  const appendAudit = (entry) => {
+    const sessionId = ctx.session?.sessionId;
+    const stamped = sessionId && entry.sessionId === undefined
+      ? { ...entry, sessionId }
+      : entry;
+    try { Promise.resolve(ctx.audit(stamped)).catch(() => {}); } catch { /* best effort */ }
+  };
   const tool = getTool(call.name);
   if (!tool) {
+    appendAudit({
+      type: 'tool_blocked',
+      details: {
+        tool: call.name, dispatchId: call.id ?? null, primitive: 'unknown',
+        dispatch: null, sideEffect: 'unknown', origins: [],
+        gate: 'registry', reason: 'unknown_tool',
+      },
+    });
     return {
       ok: false,
       error: `unknown_tool: ${call.name}`,
@@ -351,6 +355,28 @@ export const dispatchToolCall = async (call, ctx) => {
   // (gates are about authorization, not arg transformation).
   let args = call.args ?? {};
 
+  // why: AET reads this boundary; retain origins, never request paths/bodies.
+  /**
+   * @param {string} type
+   * @param {Record<string, any>} [details]
+   * @param {{ hideOrigins?: boolean }} [options]
+   */
+  const auditTool = (type, details = {}, { hideOrigins = false } = {}) => appendAudit({
+    type,
+    details: {
+      tool: call.name,
+      dispatchId: call.id ?? null,
+      primitive: tool.primitive,
+      dispatch: tool.dispatch,
+      sideEffect: tool.sideEffect,
+      networkAccess: typeof tool.networkAccess === 'function'
+        ? tool.networkAccess(args, ctx)
+        : tool.networkAccess ?? 'none',
+      origins: hideOrigins ? [] : safeOrigins(tool, args, ctx),
+      ...details,
+    },
+  });
+
   // why: the live hook population + a per-call lineage accumulator. Hook
   // outcomes ride along in meta next to gate results so the same legible
   // "what ran and why" story the gates get extends to hooks. The runner
@@ -365,7 +391,7 @@ export const dispatchToolCall = async (call, ctx) => {
   const gateResults = [];
   /** @param {string} stage @returns {ToolResult} */
   const abortedResult = (stage) => {
-    ctx.audit({ type: 'tool_blocked', details: { tool: call.name, gate: 'abort', reason: stage } }).catch(() => {});
+    auditTool('tool_blocked', { gate: 'abort', reason: stage });
     return {
       ok: false,
       error: `tool_aborted:${call.name}:${stage}`,
@@ -384,7 +410,7 @@ export const dispatchToolCall = async (call, ctx) => {
     } catch (e) {
       const reason = /** @type {{ message?: string }} */ (e)?.message ?? 'auth_state_unavailable';
       gateResults.push({ name: 'live-landing', allowed: false, reason });
-      ctx.audit({ type: 'tool_blocked', details: { tool: call.name, gate: 'live-landing', reason } }).catch(() => {});
+      auditTool('tool_blocked', { gate: 'live-landing', reason });
       return {
         ok: false,
         error: 'auth_state_unavailable',
@@ -399,10 +425,7 @@ export const dispatchToolCall = async (call, ctx) => {
     if (!landing || landing.action === 'continue') return null;
     const waiting = landing.action === 'wait';
     gateResults.push({ name: 'live-landing', allowed: false, reason: landing.reason });
-    ctx.audit({
-      type: 'tool_blocked',
-      details: { tool: call.name, gate: 'live-landing', reason: landing.reason },
-    }).catch(() => {});
+    auditTool('tool_blocked', { gate: 'live-landing', reason: landing.reason });
     return {
       ok: false,
       error: waiting ? AUTH_WAITING_FOR_USER_CODE : `origin_lock: ${landing.reason}`,
@@ -434,10 +457,7 @@ export const dispatchToolCall = async (call, ctx) => {
     gateResults.push({ name, ...result });
     if (!result.allowed) {
       // Fire-and-forget audit; don't block on it.
-      ctx.audit({
-        type: 'tool_blocked',
-        details: { tool: call.name, gate: name, reason: result.reason },
-      }).catch(() => {});
+      auditTool('tool_blocked', { gate: name, reason: result.reason });
       const authWait = name === 'auth-wait' && result.reason === AUTH_WAITING_FOR_USER_CODE;
       return {
         ok: false,
@@ -595,10 +615,7 @@ export const dispatchToolCall = async (call, ctx) => {
         : 'rejected by user') + how;
     }
     if (!approved) {
-      ctx.audit({
-        type: 'tool_rejected',
-        details: { tool: call.name, gate: 'confirmation', answer, ugcZone: ugcRuleId ?? undefined },
-      }).catch(() => {});
+      auditTool('tool_rejected', { gate: 'confirmation', answer, ugcZone: ugcRuleId ?? undefined });
       return {
         ok: false,
         error: `gate_blocked:confirmation:${confirmEntry?.reason ?? 'rejected by user'}`,
@@ -611,10 +628,7 @@ export const dispatchToolCall = async (call, ctx) => {
         }),
       };
     }
-    ctx.audit({
-      type: 'tool_confirmed',
-      details: { tool: call.name, answer, ugcZone: ugcRuleId ?? undefined },
-    }).catch(() => {});
+    auditTool('tool_confirmed', { answer, ugcZone: ugcRuleId ?? undefined });
   }
   if (ctx.abortSignal?.aborted) return abortedResult('after_confirmation');
 
@@ -641,10 +655,7 @@ export const dispatchToolCall = async (call, ctx) => {
   const pre = await runPreToolUse({ hooks, toolName: call.name, args, ctx: hookCtx });
   hookOutcomes.push(...pre.outcomes);
   if (!pre.allowed) {
-    ctx.audit({
-      type: 'tool_blocked',
-      details: { tool: call.name, gate: 'pre-tool-use-hook', reason: pre.reason },
-    }).catch(() => {});
+    auditTool('tool_blocked', { gate: 'pre-tool-use-hook', reason: pre.reason });
     return {
       ok: false,
       error: `hook_blocked:pre-tool-use:${pre.reason}`,
@@ -733,10 +744,7 @@ export const dispatchToolCall = async (call, ctx) => {
       };
     });
     if (begun && 'refuse' in begun && begun.refuse) {
-      ctx.audit({
-        type: 'tool_blocked',
-        details: { tool: call.name, gate: 'lifecycle-replay-guard', reason: begun.refuse.error },
-      }).catch(() => {});
+      auditTool('tool_blocked', { gate: 'lifecycle-replay-guard', reason: begun.refuse.error });
       return {
         ok: false,
         error: begun.refuse.error,
@@ -789,6 +797,14 @@ export const dispatchToolCall = async (call, ctx) => {
   const execCtx = {
     ...ctx,
     toolUseId: call.id,
+    // why closure: concurrent calls cannot safely mutate the shared context.
+    ...(typeof ctx.webFetch === 'function' ? {
+      webFetch: (/** @type {any} */ resource, /** @type {any} */ init) =>
+        /** @type {any} */ (ctx.webFetch)(resource, init, {
+          sessionId: ctx.session?.sessionId,
+          dispatchId: call.id,
+        }),
+    } : {}),
     // Tools with their own mandatory consent surface call ctx.confirm from
     // execute(). Bind those prompts to this exact model dispatch too; a prompt
     // UUID and session are not enough evidence that the answer covers this
@@ -889,19 +905,11 @@ export const dispatchToolCall = async (call, ctx) => {
     // path as tool_executed made the audit log report ≈zero failures while
     // the transcript's is_error flag showed them. Branch on result.ok so a
     // returned failure lands in the SAME tool_failed bucket as a throw.
-    ctx.audit(result?.ok === false
-      ? {
-        type: 'tool_failed',
-        details: {
-          tool: call.name, primitive: tool.primitive, dispatch: tool.dispatch,
-          durationMs, error: result.error,
-          ...(browserPolicy ? { browserPolicy } : {}),
-        },
-      }
-      : {
-        type: 'tool_executed',
-        details: { tool: call.name, primitive: tool.primitive, dispatch: tool.dispatch, durationMs },
-      }).catch(() => {});
+    auditTool(result?.ok === false ? 'tool_failed' : 'tool_executed', {
+      durationMs,
+      ...(result?.ok === false ? { error: 'tool_failed' } : {}),
+      ...(browserPolicy ? { browserPolicy } : {}),
+    }, { hideOrigins: browserPolicy !== null });
     // ---- Post-tool-use hooks --------------------------------------------
     // why: observe-only in V1. Post-hooks see the result but cannot
     // change it — the side effect already happened, so a post-hook throw
@@ -1028,17 +1036,11 @@ export const dispatchToolCall = async (call, ctx) => {
     const endTurn = /** @type {{ endTurn?: boolean }} */ (e)?.endTurn === true;
     const endingContent = /** @type {{ content?: unknown }} */ (e)?.content;
     const browserPolicy = browserPolicyAuditDetails(exposedError);
-    ctx.audit({
-      type: 'tool_failed',
-      // why: same rich shape as the returned-{ok:false} failure above so
-      // BOTH failure sources are uniform — audit mining can group throws and
-      // returned failures by the same primitive/dispatch keys.
-      details: {
-        tool: call.name, primitive: tool.primitive, dispatch: tool.dispatch,
-        error: exposedError?.error ?? message, durationMs,
-        ...(browserPolicy ? { browserPolicy } : {}),
-      },
-    }).catch(() => {});
+    // why: throws and returned failures must produce the same audit shape.
+    auditTool('tool_failed', {
+      error: 'tool_failed', durationMs,
+      ...(browserPolicy ? { browserPolicy } : {}),
+    }, { hideOrigins: browserPolicy !== null });
     // why: post-hooks still observe a FAILED execution — a failure is an
     // observable event (e.g. an audit/metrics hook wants to count it).
     const post = await runPostToolUse({

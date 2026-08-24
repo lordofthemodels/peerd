@@ -105,7 +105,8 @@ export const siteClientRunTool = {
     let result;
     try {
       result = await jsOffscreenClient.execHeadless(wrapped, {
-        timeoutMs, siteFetch: origin, ownerSessionId, runId,
+        timeoutMs, siteFetch: origin, ownerSessionId,
+        ownerToolUseId: /** @type {any} */ (ctx).toolUseId, runId,
         signal: extras.abortSignal,
       });
     } catch (e) {

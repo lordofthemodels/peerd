@@ -563,6 +563,14 @@ export const makeActorMessaging = (deps) => {
       // free-form/error bodies were previously clamped at the callsite — apply the
       // single RESULT_CHARS ceiling here for every path.
       outBody = outBody.slice(0, RESULT_CHARS);
+      appendAudit({
+        type: 'actor_completed', sessionId: actorSessionId,
+        details: {
+          actorSessionId, instanceId, kind, correlationId,
+          parentDispatchId: parentToolUseId,
+          failed: outFailed, outcomeKnown: !outcomeUnknown, performed, aborted,
+        },
+      }).catch(() => {});
       // deliverInstead() true = the awaiting caller already resolved by its
       // wall-clock cap (degrade-to-async): the actor kept working, so its now-
       // arrived reply must route to the sender's LATER turn (deliver) instead of
@@ -879,7 +887,16 @@ export const makeActorMessaging = (deps) => {
     recentSends.set(rootSessionId, recent);
     inFlight.set(rootSessionId, (inFlight.get(rootSessionId) ?? 0) + 1);
     trackIntent(rootSessionId, intentK);
-    appendAudit({ type: 'actor_message', details: { to: instanceId, kind, senderSessionId, rootSessionId, lineagePath: provenance.lineagePath, ...(typeof via === 'string' ? { via } : {}) } }).catch(() => {});
+    const correlationId = makeCorrelationId();
+    appendAudit({
+      type: 'actor_message', sessionId: actorSessionId,
+      details: {
+        actorSessionId, correlationId, parentDispatchId: toolUseId,
+        to: instanceId, kind,
+        senderSessionId, rootSessionId, lineagePath: provenance.lineagePath,
+        ...(typeof via === 'string' ? { via } : {}),
+      },
+    }).catch(() => {});
 
     // ASYNC for EVERY long-lived sender, including web, unless the caller opted
     // into `await:true`, which takes the awaitReply branch below instead. On THIS
@@ -899,7 +916,6 @@ export const makeActorMessaging = (deps) => {
     // origins and may legitimately be much longer than the post-commit hook's
     // defensive id ceiling; embedding the address would make those replies
     // impossible to acknowledge. The mailbox record already stores `to`.
-    const correlationId = makeCorrelationId();
     // Persist oneShot for diagnostics. The provenance rides the envelope so boot
     // recovery can reroute a notice whose awaiting sender was ephemeral.
     try {
