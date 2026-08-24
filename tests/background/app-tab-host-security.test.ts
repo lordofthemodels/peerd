@@ -32,6 +32,14 @@ describe('App tab required-actor and runtime lifecycle contracts', () => {
     expect(host).toContain('makeUiRuntimeClient({ browser })');
     expect(host).toContain("saveRetry.textContent = saveOutcomeUnknown ? 'Reload to reconcile' : 'Retry'");
     expect(host).toContain('if (saveOutcomeUnknown)');
+    const hubSurfaceRoute = host.indexOf("message?.type !== 'app/show-surface'");
+    const hubSurfaceGuard = host.lastIndexOf('if (!isServiceWorkerSender(sender)', hubSurfaceRoute);
+    expect(hubSurfaceRoute).toBeGreaterThan(-1);
+    expect(hubSurfaceGuard).toBeGreaterThan(-1);
+    expect(hubSurfaceGuard).toBeLessThan(hubSurfaceRoute);
+    expect(host.slice(hubSurfaceRoute, hubSurfaceRoute + 240))
+      .toContain('message.appId !== appId');
+    expect(host).toContain('requestedHostSurface ? showHostSurface(requestedHostSurface)');
     expect(host).not.toContain('browser.runtime.sendMessage');
     expect(host).not.toContain('message.innerHTML =');
 

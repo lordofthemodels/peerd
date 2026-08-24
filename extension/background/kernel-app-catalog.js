@@ -6,6 +6,116 @@ import { makeSerialLane } from '../shared/cold-util.js';
 
 export const KERNEL_APP_CATALOG_KEY = 'apps.v1';
 
+const INSTRUCTION_PREVIEW_MAX = 480;
+const CONTROL_OR_BIDI = /[\u0000-\u001F\u007F-\u009F\u061C\u200B-\u200F\u202A-\u202E\u2066-\u2069]/g;
+const DEFAULT_APP_AGENT = Object.freeze({
+  kind: 'bound-app', profile: 'developer', surface: 'code',
+});
+
+/** @param {unknown} value */
+const normalizedDisplayText = (value) => typeof value === 'string'
+  ? value.replace(CONTROL_OR_BIDI, ' ').replace(/\s+/g, ' ').trim() : '';
+
+/** @param {unknown} value @param {string} fallback @param {number} max */
+const displayText = (value, fallback, max) =>
+  (normalizedDisplayText(value) || fallback).slice(0, max);
+
+/** @param {unknown} value */
+const instructionPreview = (value) => {
+  const valueText = normalizedDisplayText(value);
+  if (!valueText) return null;
+  return valueText.length > INSTRUCTION_PREVIEW_MAX
+    ? `${valueText.slice(0, INSTRUCTION_PREVIEW_MAX - 1)}…` : valueText;
+};
+
+/**
+ * Human-facing projection only. Authority continues to use app-actor-policy.js.
+ * @param {any} app
+ * @param {any|null} contract
+ * @param {'declared'|'default'|'invalid'|'unavailable'} manifest
+ */
+export const kernelAppActorMetadata = (app, contract, manifest = 'declared') => {
+  const agent = contract?.agent ?? DEFAULT_APP_AGENT;
+  const publisher = typeof app?.dweb?.publisher === 'string'
+    ? app.dweb.publisher.trim() : '';
+  const provenance = publisher
+    ? { source: app?.source === 'dweb' ? 'dweb' : 'local', publisher }
+    : app?.source === 'imported'
+      ? { source: 'unsigned-import', publisher: 'unsigned import' }
+      : { source: 'local', publisher: 'local user' };
+  const appName = displayText(app?.name, 'App', 80);
+  const versionId = typeof app?.dweb?.version_id === 'string'
+    ? app.dweb.version_id : null;
+  return Object.freeze({
+    id: `app:${app.id}`,
+    handle: app.id,
+    appName,
+    name: displayText(agent.name, `${appName.slice(0, 74)} actor`, 80),
+    kind: 'app',
+    model: 'owner-chat',
+    profile: agent.profile ?? 'developer',
+    surface: agent.surface ?? 'code',
+    runtime: Object.freeze(Array.isArray(agent.runtime) ? [...agent.runtime] : []),
+    capabilities: Object.freeze(Array.isArray(contract?.capabilities)
+      ? contract.capabilities.map((/** @type {unknown} */ value) =>
+          displayText(value, '', 64)).filter(Boolean)
+      : []),
+    instructions: Object.freeze({
+      custom: typeof agent.instructions === 'string' && !!agent.instructions.trim(),
+      preview: instructionPreview(agent.instructions),
+    }),
+    manifest,
+    provenance: Object.freeze({
+      source: provenance.source,
+      publisher: displayText(provenance.publisher, 'unknown', 160),
+    }),
+    version: versionId
+      ? Object.freeze({
+          kind: 'published', id: displayText(versionId, '', 160),
+          sequence: Number.isSafeInteger(app?.dweb?.seq) && app.dweb.seq >= 0
+            ? app.dweb.seq : null,
+        })
+      : Object.freeze({
+          kind: 'working-copy', id: null,
+          updatedAt: typeof app?.updatedAt === 'number' ? app.updatedAt : null,
+        }),
+    security: Object.freeze({
+      boundary: 'dedicated-keyless-worker',
+      authority: 'host-profile-intersect-owner',
+    }),
+  });
+};
+
+/** @param {any} app @param {any} appFiles */
+const describeAppActor = async (app, appFiles) => {
+  if (typeof appFiles?.readText !== 'function') {
+    return kernelAppActorMetadata(app, null, 'default');
+  }
+  try {
+    if (typeof appFiles.listApp === 'function') {
+      const paths = await appFiles.listApp(app.id);
+      if (!Array.isArray(paths)) return kernelAppActorMetadata(app, null, 'unavailable');
+      const hasManifest = paths.some((/** @type {unknown} */ path) =>
+        typeof path === 'string' && path.replace(/^\/+/, '') === 'peerd.json');
+      // why list before read: the repository transport intentionally bounds
+      // errors, so a missing file loses its NotFoundError name in transit.
+      if (!hasManifest) return kernelAppActorMetadata(app, null, 'default');
+    }
+    const contract = parseAppManifest(await appFiles.readText(app.id, 'peerd.json'));
+    return kernelAppActorMetadata(app, contract, 'declared');
+  } catch (cause) {
+    if (/** @type {{name?:unknown}} */ (cause)?.name === 'NotFoundError') {
+      return kernelAppActorMetadata(app, null, 'default');
+    }
+    const message = typeof /** @type {{message?:unknown}} */ (cause)?.message === 'string'
+      ? /** @type {{message:string}} */ (cause).message : '';
+    const invalid = message.startsWith('peerd.json ') || message.startsWith('a dwapp manifest ');
+    // why unavailable is separate: a transient filesystem fault is not evidence
+    // that a package declaration is malformed, and the Hub must not say it is.
+    return kernelAppActorMetadata(app, null, invalid ? 'invalid' : 'unavailable');
+  }
+};
+
 /** @param {unknown} cause @param {string} code @param {string} action */
 const catalogEffectFailure = (cause, code, action) => {
   void cause;
@@ -214,9 +324,21 @@ export const makeKernelAppCatalogRoutes = ({
   browser = null, appTabUrl = '', sessionCache = undefined,
   isAppSender = () => false, appFiles = undefined, dwebEnabled = false,
 }) => Object.freeze({
-  'apps/list': async () => {
+  'apps/list': async (
+    /** @type {{includeActorMetadata?:unknown}} */ { includeActorMetadata } = {},
+  ) => {
     if (vault.isLocked()) return { ok: false, error: 'vault-locked' };
-    try { return { ok: true, apps: await catalog.list() }; }
+    try {
+      const apps = await catalog.list();
+      if (includeActorMetadata !== true) return { ok: true, apps };
+      const described = [];
+      // why sequential: a large local catalog must not fan out an unbounded
+      // burst of OPFS reads merely because the Hub's Actors view opened.
+      for (const app of apps) {
+        described.push({ ...app, actor: await describeAppActor(app, appFiles) });
+      }
+      return { ok: true, apps: described };
+    }
     catch (cause) {
       return { ok: false, error: /** @type {{message?:string}} */ (cause)?.message ?? String(cause) };
     }
@@ -249,21 +371,39 @@ export const makeKernelAppCatalogRoutes = ({
       return catalogEffectFailure(cause, 'app-rename-outcome-unknown', 'the App rename');
     }
   },
-  'apps/open': async (/** @type {{appId?:unknown}} */ { appId } = {}) => {
+  'apps/open': async (
+    /** @type {{appId?:unknown,surface?:unknown}} */ { appId, surface } = {},
+  ) => {
     if (vault.isLocked()) return { ok: false, error: 'vault-locked' };
     if (typeof appId !== 'string') return { ok: false, error: 'appId-required' };
+    if (surface !== undefined && surface !== 'actor' && surface !== 'edit') {
+      return { ok: false, error: 'app-surface-invalid' };
+    }
     const app = await catalog.get(appId);
     if (!app) return { ok: false, error: 'app-not-found' };
     const sessionId = await sessionCache?.sessionGet('currentSessionId');
     const owner = typeof sessionId === 'string' ? sessionId
       : typeof app.ownerSessionId === 'string' ? app.ownerSessionId : null;
-    const url = `${appTabUrl}#${appId}${owner ? `?owner=${encodeURIComponent(owner)}` : ''}`;
+    const launch = new URLSearchParams();
+    if (owner) launch.set('owner', owner);
+    if (surface === 'actor' || surface === 'edit') launch.set('surface', surface);
+    const url = `${appTabUrl}#${appId}${launch.size ? `?${launch}` : ''}`;
     const existing = (await browser?.tabs?.query?.({ url: `${appTabUrl}#${appId}*` }) ?? [])[0];
     try {
-      if (typeof existing?.id === 'number') await browser.tabs.update(existing.id, { active: true });
-      else await browser?.tabs?.create?.({ url, active: true });
+      let surfaceFocused = true;
+      if (typeof existing?.id === 'number') {
+        await browser.tabs.update(existing.id, { active: true });
+        if (surface === 'actor' || surface === 'edit') {
+          try {
+            const reply = await browser.tabs.sendMessage?.(existing.id, {
+              type: 'app/show-surface', appId, surface,
+            });
+            surfaceFocused = reply?.ok === true;
+          } catch { surfaceFocused = false; }
+        }
+      } else await browser?.tabs?.create?.({ url, active: true });
       if (typeof sessionId === 'string') await catalog.setDefaultForSession(sessionId, appId);
-      return { ok: true };
+      return { ok: true, ...(surfaceFocused ? {} : { warning: 'app-surface-unavailable' }) };
     } catch (cause) {
       return catalogEffectFailure(cause, 'app-open-outcome-unknown', 'opening the App');
     }

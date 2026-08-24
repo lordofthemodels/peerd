@@ -121,6 +121,8 @@ describe('home.library', () => {
     const { root, unmount } = await mountView(makeSend());
     try {
       // Snake Game is favorited → sorts above the more-recently-updated Calculator.
+      expect(root.querySelector('.hub-section-heading h1')?.textContent).toBe('My Apps');
+      expect(root.querySelector('.hub-section-heading')?.textContent).toContain('each with its own scoped actor');
       expect(names(root)).toEqual(['Snake Game', 'Calculator']);
     } finally { unmount(); }
   });

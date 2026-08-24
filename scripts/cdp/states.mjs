@@ -363,12 +363,127 @@ const captureHomeLibraryGit = async (ctx, rec, { visualName, metrics, revealPane
   }
 };
 
+const verifyLiveHomeHubActors = async (ctx, rec) => {
+  const imported = await evalIn(ctx.page, `(async () => {
+    const { buildAppExport } = await import('/peerd-engine/index.js');
+    const manifest = {
+      schema: 1,
+      kind: 'app',
+      entry: 'index.html',
+      agent: {
+        kind: 'bound-app',
+        profile: 'developer',
+        surface: 'code',
+        name: 'Cohort analyst',
+        instructions: 'Analyze the current cohort chart before changing it.',
+        runtime: ['observe', 'act'],
+      },
+      capabilities: [],
+    };
+    const envelope = await buildAppExport({
+      record: { name: 'Cohort Board', entryFile: 'index.html', tags: ['visual-fixture'] },
+      files: {
+        'peerd.json': JSON.stringify(manifest, null, 2),
+        'index.html': '<!doctype html><title>Cohort Board</title><main>Cohort Board</main>',
+      },
+    });
+    return chrome.runtime.sendMessage({ type: 'import/apply', envelope });
+  })()`, true);
+  rec.check('Hub visual fixture imports one App actor contract',
+    imported?.ok === true && imported?.kind === 'app', JSON.stringify(imported));
+  const appId = imported?.id ?? '';
+  const cardSelector = `[data-app-actor-id="app:${appId}"]`;
+  let page = null;
+  try {
+    page = await openWidePage(ctx, 'home/home.html#actors');
+    const ready = appId && await waitFor(() => evalIn(page,
+      `!!document.querySelector(${JSON.stringify(cardSelector)})`),
+    { budgetMs: 20_000, pollMs: 80 });
+    rec.check('the Hub renders the imported App in My Actors', !!ready);
+    await evalIn(page,
+      `document.querySelector(${JSON.stringify(`${cardSelector} .hub-actor-card-toggle`)})?.click()`);
+    const detail = await waitFor(() => evalIn(page, `(() => {
+      const card = document.querySelector(${JSON.stringify(cardSelector)});
+      const facts = card?.querySelector('.hub-actor-detail');
+      const actions = [...card?.querySelectorAll('.hub-actor-actions button') ?? []]
+        .map((button) => ({ text: button.textContent.trim(), disabled: button.disabled }));
+      return facts ? {
+        text: facts.textContent ?? '',
+        expanded: card.querySelector('.hub-actor-card-toggle')?.getAttribute('aria-expanded'),
+        actions,
+        documentWidth: document.documentElement.scrollWidth,
+        viewport: innerWidth,
+      } : null;
+    })()`), { budgetMs: 5_000, pollMs: 50 });
+    rec.check('My Actors exposes model, capabilities, provenance, and security facts',
+      detail?.expanded === 'true'
+        && detail?.text.includes('Inherits the owner chat model')
+        && detail?.text.includes('App observe, App act')
+        && detail?.text.includes('Unsigned Git or package import')
+        && detail?.text.includes('Dedicated keyless worker')
+        && detail?.actions?.some((action) => action.text === 'Chat' && !action.disabled)
+        && detail?.actions?.some((action) => action.text === 'Customize' && !action.disabled)
+        && detail?.documentWidth <= detail?.viewport,
+      JSON.stringify(detail));
+  } finally {
+    try { page?.close(); } catch { /* */ }
+    if (appId) {
+      const deleted = await evalIn(ctx.page,
+        `chrome.runtime.sendMessage({ type: 'apps/delete', appId: ${JSON.stringify(appId)} })`, true)
+        .catch(() => null);
+      rec.check('Hub visual fixture App removed after capture',
+        deleted?.ok === true, JSON.stringify(deleted));
+    }
+  }
+};
+
 export const STATES = [
   // --- visual: the pre-unlock setup screen (must capture BEFORE unlock) -------
   {
     name: 'initial-screen', kind: 'visual', phase: 'pre-unlock',
     responder: null,
     async run(ctx, rec) { await rec.visual('initial-screen'); },
+  },
+
+  // This real-component fixture stays pre-unlock so the Hub layout remains
+  // visually reviewable while the native-kernel branch is cutting over its
+  // human-sender boot path. The separate live state below owns integration.
+  {
+    name: 'home-hub-actors', kind: 'visual', phase: 'pre-unlock',
+    responder: null,
+    async run(ctx, rec) {
+      const page = await openWidePage(ctx, 'tests/fixtures/home-hub-actors.html');
+      try {
+        const ready = await waitFor(() => evalIn(page,
+          `!!document.querySelector('[data-app-actor-id="app:fixture-app"]')`),
+        { budgetMs: 8_000, pollMs: 50 });
+        rec.check('the Hub actor component fixture renders', !!ready);
+        await evalIn(page,
+          `document.querySelector('[data-app-actor-id="app:fixture-app"] .hub-actor-card-toggle')?.click()`);
+        const expanded = await waitFor(() => evalIn(page,
+          `document.querySelector('[data-app-actor-id="app:fixture-app"] .hub-actor-card-toggle')?.getAttribute('aria-expanded') === 'true'`),
+        { budgetMs: 2_000, pollMs: 40 });
+        rec.check('the visual fixture exposes the complete actor details', !!expanded);
+        await rec.visualPage('home-hub-actors', page);
+        await page.send('Emulation.setDeviceMetricsOverride', {
+          width: 390, height: 844, deviceScaleFactor: 1, mobile: false,
+        });
+        await sleep(100);
+        const narrow = await evalIn(page, `(() => ({
+          viewport: innerWidth,
+          documentWidth: document.documentElement.scrollWidth,
+          actionsTall: [...document.querySelectorAll('.hub-actor-actions button')]
+            .every((button) => button.getBoundingClientRect().height >= 44),
+          detailsVisible: !!document.querySelector('.hub-actor-detail'),
+        }))()`);
+        rec.check('the expanded actor contract reflows at 390 CSS pixels',
+          narrow?.documentWidth <= narrow?.viewport
+            && narrow?.actionsTall === true
+            && narrow?.detailsVisible === true,
+          JSON.stringify(narrow));
+        await rec.visualPage('home-hub-actors-narrow', page);
+      } finally { try { page.close(); } catch { /* */ } }
+    },
   },
 
   // --- functional: one full happy-path turn ----------------------------------
@@ -3124,6 +3239,13 @@ export const STATES = [
         await rec.visualPage('home-fulltab', page, { beforeShot: pinQuietHome });
       } finally { try { page.close(); } catch { /* */ } }
     },
+  },
+
+  // --- functional (WIDE): real catalog → durable App actor projection --------
+  {
+    name: 'home-hub-actors-live', kind: 'functional', phase: 'post-unlock',
+    responder: () => ({ sse: sseText('noted') }),
+    async run(ctx, rec) { await verifyLiveHomeHubActors(ctx, rec); },
   },
 
   // --- visual (WIDE): browser-native Git history on an App -------------------

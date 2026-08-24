@@ -29,6 +29,22 @@ const OVERVIEW = {
   }],
 };
 
+const APP_CATALOG = [{
+  id: 'app-a', name: 'Cohort Board',
+  actor: {
+    id: 'app:app-a', appName: 'Cohort Board', name: 'Cohort analyst', manifest: 'declared',
+    model: 'owner-chat', profile: 'developer', surface: 'code',
+    runtime: ['observe', 'act'], capabilities: ['dweb'],
+    instructions: { custom: true, preview: 'Analyze the current cohort chart before changing it.' },
+    provenance: { source: 'dweb', publisher: 'did:key:publisher' },
+    version: { kind: 'published', id: 'abcdef1234567890', sequence: 4 },
+  },
+}];
+
+/** @param {any} message */
+const sendOverview = async (message) => message.type === 'apps/list'
+  ? { ok: true, apps: APP_CATALOG } : OVERVIEW;
+
 const flush = async () => {
   await new Promise((resolve) => setTimeout(resolve, 0));
   m.redraw.sync();
@@ -40,9 +56,8 @@ describe('home.actors', () => {
     document.body.appendChild(root);
     /** @type {string[]} */
     const opened = [];
-    const send = async () => OVERVIEW;
     m.mount(root, { view: () => m(ActorsSection, {
-      send,
+      send: sendOverview,
       onOpenSession: (/** @type {string} */ sessionId) => opened.push(sessionId),
       currentSessionId: 'chat-a',
     }) });
@@ -52,9 +67,11 @@ describe('home.actors', () => {
       expect(root.querySelectorAll('.actor-space-node').length).toBe(3);
       const stats = root.querySelectorAll('.actor-space-stat');
       expect(stats[0].querySelector('strong')?.textContent).toBe('1');
-      expect(stats[0].querySelector('span')?.textContent).toBe('orchestrator');
-      expect(stats[1].querySelector('strong')?.textContent).toBe('2');
-      expect(stats[1].querySelector('span')?.textContent).toBe('isolated actors');
+      expect(stats[0].querySelector('span')?.textContent).toBe('App actor');
+      expect(stats[1].querySelector('strong')?.textContent).toBe('1');
+      expect(stats[1].querySelector('span')?.textContent).toBe('orchestrator');
+      expect(stats[2].querySelector('strong')?.textContent).toBe('2');
+      expect(stats[2].querySelector('span')?.textContent).toBe('isolated actors');
       expect(root.querySelector('.actor-space-node.is-bound')).toBeTruthy();
       expect(root.querySelector('.actor-space-node.is-subactor')).toBeTruthy();
 
@@ -75,7 +92,7 @@ describe('home.actors', () => {
       expect(document.activeElement).toBe(selected);
       expect(selected.getAttribute('aria-expanded')).toBe('false');
 
-      /** @type {HTMLButtonElement} */ (root.querySelector('.actor-space-open-chat')).click();
+      /** @type {HTMLButtonElement} */ (root.querySelector('.actor-space-room .actor-space-open-chat')).click();
       expect(opened).toEqual(['chat-a']);
     } finally {
       m.mount(root, null);
@@ -88,10 +105,11 @@ describe('home.actors', () => {
     document.body.appendChild(root);
     /** @type {(value: any) => void} */
     let finishRefresh = () => {};
-    let calls = 0;
-    const send = async () => {
-      calls += 1;
-      if (calls === 1) return OVERVIEW;
+    let overviewCalls = 0;
+    const send = async (/** @type {any} */ message) => {
+      if (message.type === 'apps/list') return { ok: true, apps: APP_CATALOG };
+      overviewCalls += 1;
+      if (overviewCalls === 1) return OVERVIEW;
       return new Promise((resolve) => { finishRefresh = resolve; });
     };
     m.mount(root, { view: () => m(ActorsSection, {
@@ -103,7 +121,7 @@ describe('home.actors', () => {
       expect(destination.textContent).toBe('Current in side panel');
       expect(destination.disabled).toBe(true);
 
-      const refresh = /** @type {HTMLButtonElement} */ (root.querySelector('.actor-space-refresh'));
+      const refresh = /** @type {HTMLButtonElement} */ (root.querySelector('.actor-space-refresh--live'));
       refresh.click();
       m.redraw.sync();
       expect(refresh.textContent).toBe('Refreshing…');
@@ -120,18 +138,20 @@ describe('home.actors', () => {
   it('moves focus to stable controls when polling removes a running actor', async () => {
     const root = document.createElement('div');
     document.body.appendChild(root);
-    let calls = 0;
+    let overviewCalls = 0;
     m.mount(root, { view: () => m(ActorsSection, {
-      send: async () => (++calls === 1 ? OVERVIEW : { ok: true, roots: [] }),
+      send: async (/** @type {any} */ message) => message.type === 'apps/list'
+        ? { ok: true, apps: APP_CATALOG }
+        : (++overviewCalls === 1 ? OVERVIEW : { ok: true, roots: [] }),
       onOpenSession: () => {},
     }) });
     await flush();
     try {
       /** @type {HTMLButtonElement} */ (root.querySelector('.actor-space-node.is-subactor')).focus();
-      /** @type {HTMLButtonElement} */ (root.querySelector('.actor-space-refresh')).click();
+      /** @type {HTMLButtonElement} */ (root.querySelector('.actor-space-refresh--live')).click();
       await flush();
       await new Promise((resolve) => requestAnimationFrame(resolve));
-      expect(document.activeElement).toBe(root.querySelector('.actor-space-refresh'));
+      expect(document.activeElement).toBe(root.querySelector('.actor-space-refresh--live'));
       expect(root.querySelector('[aria-live="polite"]')?.textContent).toContain('Actor finished');
     } finally {
       m.mount(root, null);
@@ -143,12 +163,159 @@ describe('home.actors', () => {
     const root = document.createElement('div');
     document.body.appendChild(root);
     m.mount(root, { view: () => m(ActorsSection, {
-      send: async () => ({ ok: true, roots: [] }), onOpenSession: () => {},
+      send: async (/** @type {any} */ message) => message.type === 'apps/list'
+        ? { ok: true, apps: [] } : { ok: true, roots: [] },
+      onOpenSession: () => {},
     }) });
     await flush();
     try {
       expect(root.querySelector('.actor-space-empty')?.textContent).toContain('The instance is quiet');
-      expect(root.textContent).toContain('Every active orchestrator');
+      expect(root.textContent).toContain('durable App actors');
+      expect(root.textContent).toContain('No durable actors yet');
+    } finally {
+      m.mount(root, null);
+      root.remove();
+    }
+  });
+
+  it('shows the App-owned actor contract and routes Chat and Customize exactly', async () => {
+    const root = document.createElement('div');
+    document.body.appendChild(root);
+    /** @type {any[]} */
+    const sent = [];
+    let appsOpened = 0;
+    const send = async (/** @type {any} */ message) => {
+      sent.push(message);
+      if (message.type === 'apps/list') return { ok: true, apps: APP_CATALOG };
+      if (message.type === 'apps/open') return { ok: true };
+      return OVERVIEW;
+    };
+    m.mount(root, { view: () => m(ActorsSection, {
+      send, onOpenSession: () => {}, onOpenApps: () => { appsOpened += 1; },
+    }) });
+    await flush();
+    try {
+      const card = root.querySelector('[data-app-actor-id="app:app-a"]');
+      expect(card).toBeTruthy();
+      /** @type {HTMLButtonElement} */ (card?.querySelector('.hub-actor-card-toggle')).click();
+      m.redraw.sync();
+      expect(card?.textContent).toContain('Cohort analyst');
+      expect(card?.textContent).toContain('Inherits the owner chat model');
+      expect(card?.textContent).toContain('Peerd network backend, App observe, App act');
+      expect(card?.textContent).toContain('Analyze the current cohort chart');
+      expect(card?.textContent).toContain('release 4 · abcdef123456');
+      expect(card?.textContent).toContain('did:key:publisher');
+      expect(card?.textContent).toContain('Installed from the Peerd network');
+      expect(card?.textContent).toContain('Dedicated keyless worker');
+
+      const actions = card?.querySelectorAll('.hub-actor-actions button') ?? [];
+      /** @type {HTMLButtonElement} */ (actions[0]).click();
+      await flush();
+      /** @type {HTMLButtonElement} */ (actions[1]).click();
+      await flush();
+      /** @type {HTMLButtonElement} */ (actions[2]).click();
+      expect(sent.filter((message) => message.type === 'apps/open')).toEqual([
+        { type: 'apps/open', appId: 'app-a', surface: 'actor' },
+        { type: 'apps/open', appId: 'app-a', surface: 'edit' },
+      ]);
+      expect(appsOpened).toBe(1);
+    } finally {
+      m.mount(root, null);
+      root.remove();
+    }
+  });
+
+  it('does not turn a catalog failure into an empty-catalog claim', async () => {
+    const root = document.createElement('div');
+    document.body.appendChild(root);
+    m.mount(root, { view: () => m(ActorsSection, {
+      send: async (/** @type {any} */ message) => message.type === 'apps/list'
+        ? { ok: false, error: 'private transport detail' }
+        : { ok: true, roots: [] },
+      onOpenSession: () => {},
+    }) });
+    await flush();
+    try {
+      expect(root.textContent).toContain('App actors are temporarily unavailable');
+      expect(root.textContent).toContain('App actors could not be loaded');
+      expect(root.textContent.includes('No durable actors yet')).toBe(false);
+      expect(root.textContent.includes('private transport detail')).toBe(false);
+      expect(root.querySelector('.actor-space-stat strong')?.textContent).toBe('…');
+    } finally {
+      m.mount(root, null);
+      root.remove();
+    }
+  });
+
+  it('fences an unconfirmed App open until the user reconciles tabs', async () => {
+    const root = document.createElement('div');
+    document.body.appendChild(root);
+    let opens = 0;
+    m.mount(root, { view: () => m(ActorsSection, {
+      send: async (/** @type {any} */ message) => {
+        if (message.type === 'apps/list') return { ok: true, apps: APP_CATALOG };
+        if (message.type === 'apps/open') {
+          opens += 1;
+          return { ok: false, outcomeKnown: false };
+        }
+        return { ok: true, roots: [] };
+      },
+      onOpenSession: () => {},
+    }) });
+    await flush();
+    try {
+      const card = root.querySelector('[data-app-actor-id="app:app-a"]');
+      /** @type {HTMLButtonElement} */ (card?.querySelector('.hub-actor-card-toggle')).click();
+      m.redraw.sync();
+      const chat = /** @type {HTMLButtonElement} */ (card?.querySelector('.hub-actor-actions button'));
+      chat.click();
+      await flush();
+      expect(opens).toBe(1);
+      expect(chat.disabled).toBe(true);
+      expect(card?.textContent).toContain('Inspect your tabs before trying again');
+      chat.click();
+      expect(opens).toBe(1);
+      const reconcile = /** @type {HTMLButtonElement} */ (
+        [...card?.querySelectorAll('button') ?? []]
+          .find((button) => button.textContent?.includes('I checked my tabs'))
+      );
+      reconcile.click();
+      m.redraw.sync();
+      expect(chat.disabled).toBe(false);
+      expect(root.querySelector('.actor-space-error')).toBeFalsy();
+    } finally {
+      m.mount(root, null);
+      root.remove();
+    }
+  });
+
+  it('treats an App-open transport rejection as unknown and does not replay it', async () => {
+    const root = document.createElement('div');
+    document.body.appendChild(root);
+    let opens = 0;
+    m.mount(root, { view: () => m(ActorsSection, {
+      send: async (/** @type {any} */ message) => {
+        if (message.type === 'apps/list') return { ok: true, apps: APP_CATALOG };
+        if (message.type === 'apps/open') {
+          opens += 1;
+          throw new Error('transport closed');
+        }
+        return { ok: true, roots: [] };
+      },
+      onOpenSession: () => {},
+    }) });
+    await flush();
+    try {
+      const card = root.querySelector('[data-app-actor-id="app:app-a"]');
+      /** @type {HTMLButtonElement} */ (card?.querySelector('.hub-actor-card-toggle')).click();
+      m.redraw.sync();
+      const chat = /** @type {HTMLButtonElement} */ (card?.querySelector('.hub-actor-actions button'));
+      chat.click();
+      await flush();
+      expect(opens).toBe(1);
+      expect(chat.disabled).toBe(true);
+      chat.click();
+      expect(opens).toBe(1);
     } finally {
       m.mount(root, null);
       root.remove();
