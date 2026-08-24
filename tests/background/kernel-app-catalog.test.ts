@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   createKernelAppCatalog,
+  kernelAppActorMetadata,
   kernelAppCatalogRows,
   kernelSessionAppId,
   parseKernelAppCatalogRow,
@@ -89,6 +90,71 @@ describe('native kernel App catalog', () => {
     expect(idb.row.value.apps.a).toEqual({
       id: 'a', name: 'N'.repeat(80), favorite: true, updatedAt: 99,
     });
+  });
+
+  test('projects bounded, display-safe actor metadata without changing actor authority', async () => {
+    const app = {
+      id: 'a', name: 'Al\u202Epha', source: 'dweb', updatedAt: 10,
+      dweb: { publisher: 'did:key:pub\u202Eevil', version_id: 'abcdef123', seq: 3 },
+    };
+    const manifest = JSON.stringify({
+      schema: 1, kind: 'dwapp', entry: 'index.html', capabilities: ['dweb'],
+      agent: {
+        kind: 'bound-app', profile: 'developer', surface: 'code',
+        name: 'Cohort\u202E actor', instructions: `Inspect\u202E the chart. ${'x'.repeat(600)}`,
+        runtime: ['observe', 'act'],
+      },
+    });
+    const routes = makeKernelAppCatalogRoutes({
+      vault: { isLocked: () => false }, idb: makeIdb(),
+      catalog: { list: async () => [app] },
+      appFiles: { readText: async () => manifest },
+    });
+    const response = await routes['apps/list']({ includeActorMetadata: true });
+    expect(response).toMatchObject({ ok: true, apps: [{
+      ...app,
+      actor: {
+        id: 'app:a', handle: 'a', appName: 'Al pha', name: 'Cohort actor', kind: 'app',
+        model: 'owner-chat', runtime: ['observe', 'act'], capabilities: ['dweb'],
+        manifest: 'declared',
+        provenance: { source: 'dweb', publisher: 'did:key:pub evil' },
+        version: { kind: 'published', id: 'abcdef123', sequence: 3 },
+        security: {
+          boundary: 'dedicated-keyless-worker', authority: 'host-profile-intersect-owner',
+        },
+      },
+    }] });
+    expect(response.apps[0].actor.instructions.preview).toEndWith('…');
+    expect(response.apps[0].actor.instructions.preview).not.toContain('\u202E');
+    expect(response.apps[0].actor.instructions.preview.length).toBeLessThanOrEqual(480);
+    expect(kernelAppActorMetadata(app, null, 'default')).toMatchObject({
+      manifest: 'default', name: 'Al pha actor', runtime: [], capabilities: [],
+    });
+  });
+
+  test('distinguishes absent, invalid, and temporarily unreadable App manifests', async () => {
+    const catalog = { list: async () => [{ id: 'a', name: 'Alpha', updatedAt: 1 }] };
+    const describe = async (readText: () => Promise<string>) => {
+      const routes = makeKernelAppCatalogRoutes({
+        vault: { isLocked: () => false }, idb: makeIdb(), catalog,
+        appFiles: { readText },
+      });
+      return (await routes['apps/list']({ includeActorMetadata: true })).apps[0].actor.manifest;
+    };
+    expect(await describe(async () => { throw { name: 'NotFoundError' }; })).toBe('default');
+    expect(await describe(async () => '{')).toBe('invalid');
+    expect(await describe(async () => { throw new Error('OPFS is temporarily unavailable'); }))
+      .toBe('unavailable');
+
+    const transported = makeKernelAppCatalogRoutes({
+      vault: { isLocked: () => false }, idb: makeIdb(), catalog,
+      appFiles: {
+        listApp: async () => ['/index.html'],
+        readText: async () => { throw new Error('bounded repository-call-failed'); },
+      },
+    });
+    expect((await transported['apps/list']({ includeActorMetadata: true })).apps[0].actor.manifest)
+      .toBe('default');
   });
 
   test('creates, finalizes, selects, and removes one imported App atomically per catalog write', async () => {
@@ -215,6 +281,49 @@ describe('native kernel App catalog', () => {
       url: 'chrome-extension://id/engine-tabs/app-tab/index.html#a?owner=chat', active: true,
     }]);
     expect(idb.row.value.sessionDefaults).toEqual({ chat: 'a' });
+  });
+
+  test('opens or focuses only the requested host-owned App surface', async () => {
+    const idb = makeIdb();
+    const created: any[] = [];
+    const messages: any[] = [];
+    const common = {
+      vault: { isLocked: () => false }, idb,
+      appTabUrl: 'chrome-extension://id/engine-tabs/app-tab/index.html',
+      sessionCache: { sessionGet: async () => 'chat' },
+    };
+    const fresh = makeKernelAppCatalogRoutes({
+      ...common,
+      browser: { tabs: {
+        query: async () => [],
+        create: async (options: any) => { created.push(options); },
+      } },
+    });
+    await expect(fresh['apps/open']({ appId: 'a', surface: 'actor' }))
+      .resolves.toEqual({ ok: true });
+    expect(created).toEqual([{
+      url: 'chrome-extension://id/engine-tabs/app-tab/index.html#a?owner=chat&surface=actor',
+      active: true,
+    }]);
+    await expect(fresh['apps/open']({ appId: 'a', surface: 'other' } as any))
+      .resolves.toEqual({ ok: false, error: 'app-surface-invalid' });
+
+    const existing = makeKernelAppCatalogRoutes({
+      ...common,
+      browser: { tabs: {
+        query: async () => [{ id: 7 }],
+        update: async () => {},
+        sendMessage: async (tabId: number, message: any) => {
+          messages.push([tabId, message]);
+          return { ok: true };
+        },
+      } },
+    });
+    await expect(existing['apps/open']({ appId: 'a', surface: 'edit' }))
+      .resolves.toEqual({ ok: true });
+    expect(messages).toEqual([[7, {
+      type: 'app/show-surface', appId: 'a', surface: 'edit',
+    }]]);
   });
 
   test('app metadata revalidates peerd.json, entry existence, agent, and build dweb policy', async () => {

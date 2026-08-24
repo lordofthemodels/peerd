@@ -35,6 +35,9 @@ const launchParams = {
   room: hashParams.get('room') ?? undefined,
   url: hashParams.get('url') ?? undefined,
 };
+const hostSurfaceParam = hashParams.get('surface');
+const requestedHostSurface = hostSurfaceParam === 'actor' || hostSurfaceParam === 'edit'
+  ? hostSurfaceParam : null;
 // Actor ownership is host metadata and is never delivered to App code.
 const ownerSessionId = hashParams.get('owner') ?? undefined;
 // why the cast: these IDs are static in index.html and present at load; a single
@@ -886,6 +889,40 @@ const editMode = async () => {
   boot.classList.add('is-hidden');
 };
 
+/**
+ * Hub actions focus host-owned chrome, never App code. The service worker may
+ * also call this for an already-open tab so Chat / Customize does not reload a
+ * dirty editor merely to reveal its existing surface.
+ * @param {unknown} surface
+ */
+const showHostSurface = async (surface) => {
+  if (surface === 'actor') {
+    setActorChatOpen(true);
+    return true;
+  }
+  if (surface === 'edit') {
+    setActorChatOpen(false);
+    if (mode !== 'edit') await editMode();
+    return true;
+  }
+  return false;
+};
+
+browser.runtime.onMessage.addListener(/** @type {any} */ ((
+  /** @type {any} */ message,
+  /** @type {any} */ sender,
+  /** @type {(value:any)=>void} */ sendResponse,
+) => {
+  if (!isServiceWorkerSender(sender)
+      || message?.type !== 'app/show-surface'
+      || message.appId !== appId) return false;
+  Promise.resolve(showHostSurface(message.surface)).then(
+    (ok) => sendResponse({ ok }),
+    () => sendResponse({ ok: false }),
+  );
+  return true;
+}));
+
 // ---------------------------------------------------------------------------
 // Export — download this app as a .peerd file (DESIGN-10). The SW owns
 // the format; this is flush (if editing) → fetch envelope → Blob+anchor.
@@ -1001,12 +1038,14 @@ mountPullInPeerd();
 if (!isolation?.ok) {
   showActorAttachFailure(isolation, 'This browser cannot enforce App isolation.');
 } else {
-  renderMode().catch((error) => fail(
-    /** @type {{outcomeKnown?:boolean}} */ (error)?.outcomeKnown === false
-      ? 'Peerd could not confirm the App state after worker recovery. Reopen the App to reconcile.'
-      : 'The App could not finish loading. Retry after peerd reconnects.',
-    { retryActor: /** @type {{outcomeKnown?:boolean}} */ (error)?.outcomeKnown !== false },
-  ));
+  renderMode()
+    .then(() => requestedHostSurface ? showHostSurface(requestedHostSurface) : undefined)
+    .catch((error) => fail(
+      /** @type {{outcomeKnown?:boolean}} */ (error)?.outcomeKnown === false
+        ? 'Peerd could not confirm the App state after worker recovery. Reopen the App to reconcile.'
+        : 'The App could not finish loading. Retry after peerd reconnects.',
+      { retryActor: /** @type {{outcomeKnown?:boolean}} */ (error)?.outcomeKnown !== false },
+    ));
 }
 
 actorRetry.addEventListener('click', async () => {

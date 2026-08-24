@@ -20,6 +20,8 @@ describe('home.discover effect custody', () => {
     m.mount(root, { view: () => m(DiscoverSection, { send }) });
     try {
       await settle();
+      expect(root.querySelector('.hub-section-heading h1')?.textContent).toBe('Discover DWApps');
+      expect(root.querySelector('.hub-section-heading')?.textContent).toContain('both the App and its scoped actor');
       expect(root.textContent).toContain('could not refresh peer apps');
       expect(root.textContent.includes('raw offscreen host epoch')).toBe(false);
       expect(root.textContent.includes('Nothing shared yet')).toBe(false);
@@ -61,6 +63,7 @@ describe('home.discover effect custody', () => {
     m.mount(root, { view: () => m(DiscoverSection, { send }) });
     try {
       await settle();
+      expect(root.textContent).toContain('DWApp · includes an App actor');
       const install = /** @type {HTMLButtonElement} */ (
         [...root.querySelectorAll('button')].find((entry) => entry.textContent === 'Install')
       );

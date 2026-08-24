@@ -24,6 +24,125 @@ const displayModel = (value) => {
 /** @param {FabricNode} node */
 const nodeStatus = (node) => node.status === 'handed-off' ? 'lineage' : node.status;
 
+/** @param {any} actor */
+const actorVersion = (actor) => {
+  if (actor?.version?.kind !== 'published') return 'Local working copy';
+  const sequence = Number.isSafeInteger(actor.version.sequence)
+    ? `release ${actor.version.sequence}` : 'published release';
+  const id = typeof actor.version.id === 'string' ? actor.version.id.slice(0, 12) : '';
+  return id ? `${sequence} · ${id}` : sequence;
+};
+
+/** @param {any} actor */
+const actorProvenance = (actor) => {
+  if (actor?.provenance?.source === 'dweb') return 'Installed from the Peerd network';
+  if (actor?.provenance?.source === 'unsigned-import') return 'Unsigned Git or package import';
+  return 'Created locally';
+};
+
+/** @param {any} actor */
+const actorCapabilities = (actor) => {
+  const declared = Array.isArray(actor?.capabilities) ? actor.capabilities : [];
+  const runtime = Array.isArray(actor?.runtime) ? actor.runtime : [];
+  const labels = [
+    ...declared.map((/** @type {string} */ value) => value === 'dweb' ? 'Peerd network backend' : value),
+    ...runtime.map((/** @type {string} */ value) => `App ${value}`),
+  ];
+  return labels.length ? labels.join(', ') : 'App files and local state';
+};
+
+/**
+ * A durable App definition projected as its existing bound actor. The card
+ * deliberately shows declared package metadata separately from effective
+ * authority, which is resolved only when a chat binds the actor.
+ * @param {any} app
+ * @param {{expandedId:string,openingAppId:string,unconfirmedApps:Set<string>,announcement:string,catalogError:string}} ui
+ * @param {{openApp:(app:any,surface:'actor'|'edit')=>void|Promise<void>,openApps?:()=>void}} actions
+ */
+const appActorCard = (app, ui, actions) => {
+  const actor = app.actor ?? {};
+  const appName = actor.appName ?? 'App';
+  const actorName = actor.name ?? `${appName} actor`;
+  const expanded = ui.expandedId === actor.id;
+  const busy = ui.openingAppId === app.id;
+  const opening = !!ui.openingAppId;
+  const unconfirmed = ui.unconfirmedApps.has(app.id);
+  const publisher = actor?.provenance?.publisher ?? 'unknown';
+  const usable = actor.manifest === 'declared' || actor.manifest === 'default';
+  const manifestState = actor.manifest === 'invalid'
+    ? 'Manifest needs repair'
+    : actor.manifest === 'unavailable' ? 'Manifest could not be read'
+      : actor.manifest === 'default' ? 'Default App actor contract' : 'Declared in peerd.json';
+  return m('article.hub-actor-card', {
+    key: actor.id ?? app.id,
+    'data-app-actor-id': actor.id ?? `app:${app.id}`,
+  }, [
+    m('button.hub-actor-card-toggle', {
+      type: 'button',
+      'aria-expanded': String(expanded),
+      'aria-controls': expanded ? `hub-actor-detail-${app.id}` : undefined,
+      onclick: () => {
+        ui.expandedId = expanded ? '' : actor.id;
+        ui.announcement = expanded
+          ? `${actorName} details hidden.` : `${actorName} details shown.`;
+      },
+    }, [
+      m('span.hub-actor-glyph', { 'aria-hidden': 'true' }, '◇'),
+      m('span.hub-actor-card-copy', [
+        m('span.hub-actor-card-kind', 'App actor'),
+        m('strong', actorName),
+        m('span', `for ${appName}`),
+      ]),
+      m('span.hub-actor-card-version', actorVersion(actor)),
+    ]),
+    expanded ? m('.hub-actor-detail', {
+      id: `hub-actor-detail-${app.id}`,
+      role: 'region', 'aria-label': `Details for ${actorName}`,
+    }, [
+      actor.manifest === 'invalid' ? m('p.hub-actor-warning', { role: 'alert' },
+        'This App declares an invalid actor manifest. Repair peerd.json before trusting or using this actor.') : null,
+      actor.manifest === 'unavailable' ? m('p.hub-actor-warning', { role: 'alert' },
+        'Peerd could not read this App actor manifest. Refresh before opening or customizing it.') : null,
+      m('dl.hub-actor-facts', [
+        m('div', [m('dt', 'Model'), m('dd', 'Inherits the owner chat model')]),
+        m('div', [m('dt', 'Capabilities'), m('dd', actorCapabilities(actor))]),
+        m('div', [m('dt', 'Instructions'), m('dd', actor.instructions?.custom
+          ? actor.instructions.preview ?? 'Custom instructions declared in peerd.json'
+          : 'Default App actor instructions')]),
+        m('div', [m('dt', 'Version'), m('dd', actorVersion(actor))]),
+        m('div', [m('dt', 'Publisher'), m('dd', publisher)]),
+        m('div', [m('dt', 'Provenance'), m('dd', actorProvenance(actor))]),
+        m('div', [m('dt', 'Manifest'), m('dd', manifestState)]),
+        m('div', [m('dt', 'Security'), m('dd',
+          'Dedicated keyless worker · App-scoped host profile intersected with the owner chat')]),
+      ]),
+      unconfirmed ? m('.hub-actor-warning', { role: 'alert', 'aria-live': 'assertive' }, [
+        m('p', 'Peerd could not confirm whether the previous App open finished. Inspect your tabs before trying again.'),
+        m('button.actor-space-open-chat', {
+          type: 'button', onclick: () => {
+            ui.unconfirmedApps.delete(app.id);
+            ui.catalogError = '';
+            ui.announcement = `${appName} can be opened again.`;
+          },
+        }, 'I checked my tabs; allow another open'),
+      ]) : null,
+      m('.hub-actor-actions', [
+        m('button.actor-space-open-chat', {
+          type: 'button', disabled: opening || unconfirmed || !usable,
+          onclick: () => actions.openApp(app, 'actor'),
+        }, busy ? 'Opening…' : 'Chat'),
+        m('button.actor-space-open-chat', {
+          type: 'button', disabled: opening || unconfirmed || !usable,
+          onclick: () => actions.openApp(app, 'edit'),
+        }, 'Customize'),
+        actions.openApps ? m('button.actor-space-open-chat', {
+          type: 'button', onclick: actions.openApps,
+        }, 'Manage in Apps') : null,
+      ]),
+    ]) : null,
+  ]);
+};
+
 /** @param {FabricNode} node @param {string} selectedId @param {(node: FabricNode) => void} select */
 const actorNode = (node, selectedId, select) => m('button.actor-space-node', {
   type: 'button',
@@ -174,11 +293,20 @@ const orchestratorRoom = (
  * @property {boolean} inFlight
  * @property {boolean} active
  * @property {string} selectedId
+ * @property {any[]|null} catalog
+ * @property {string} catalogError
+ * @property {boolean} catalogLoading
+ * @property {boolean} catalogInFlight
+ * @property {string} expandedId
+ * @property {string} openingAppId
+ * @property {Set<string>} unconfirmedApps
  * @property {string} announcement
  * @property {HTMLElement|null} root
  * @property {ReturnType<typeof setInterval>|null} timer
  * @property {(() => void)|null} onVisibility
  * @property {(manual?: boolean) => Promise<void>} load
+ * @property {() => Promise<void>} loadCatalog
+ * @property {(app:any,surface:'actor'|'edit') => Promise<void>} openApp
  */
 
 /** @param {any} overview */
@@ -222,10 +350,73 @@ export const ActorsSection = {
     ui.inFlight = false;
     ui.active = true;
     ui.selectedId = '';
+    ui.catalog = null;
+    ui.catalogError = '';
+    ui.catalogLoading = true;
+    ui.catalogInFlight = false;
+    ui.expandedId = '';
+    ui.openingAppId = '';
+    ui.unconfirmedApps = new Set();
     ui.announcement = '';
     ui.root = null;
     ui.timer = null;
     ui.onVisibility = null;
+    ui.loadCatalog = async () => {
+      if (ui.catalogInFlight) return;
+      ui.catalogInFlight = true;
+      ui.catalogLoading = true;
+      try {
+        const result = await vnode.attrs.send({
+          type: 'apps/list', includeActorMetadata: true,
+        });
+        if (result?.ok !== true || !Array.isArray(result.apps)) {
+          if (ui.active) ui.catalogError = 'App actors are temporarily unavailable.';
+          return;
+        }
+        if (!ui.active) return;
+        ui.catalog = result.apps;
+        ui.catalogError = '';
+        if (ui.expandedId && !result.apps.some((/** @type {any} */ app) => app.actor?.id === ui.expandedId)) {
+          ui.expandedId = '';
+        }
+      } catch {
+        if (ui.active) ui.catalogError = 'App actors are temporarily unavailable.';
+      } finally {
+        ui.catalogInFlight = false;
+        ui.catalogLoading = false;
+        if (ui.active) m.redraw();
+      }
+    };
+    ui.openApp = async (app, surface) => {
+      if (ui.openingAppId || ui.unconfirmedApps.has(app.id)) return;
+      const appName = app.actor?.appName ?? 'App';
+      ui.openingAppId = app.id;
+      ui.catalogError = '';
+      m.redraw();
+      let replied = false;
+      try {
+        const result = await vnode.attrs.send({ type: 'apps/open', appId: app.id, surface });
+        replied = result?.ok === true || result?.ok === false;
+        if (result?.ok !== true) {
+          if (result?.outcomeKnown === false) ui.unconfirmedApps.add(app.id);
+          ui.catalogError = ui.unconfirmedApps.has(app.id)
+            ? 'The App open could not be confirmed. Inspect your tabs before retrying.'
+            : `Could not open ${appName}.`;
+          return;
+        }
+        ui.announcement = result.warning === 'app-surface-unavailable'
+          ? `${appName} opened. Use its Actor or Edit control to continue.`
+          : `${appName} ${surface === 'actor' ? 'actor chat' : 'editor'} opened.`;
+      } catch {
+        if (!replied) ui.unconfirmedApps.add(app.id);
+        ui.catalogError = ui.unconfirmedApps.has(app.id)
+          ? 'The App open could not be confirmed. Inspect your tabs before retrying.'
+          : `Could not open ${appName}.`;
+      } finally {
+        ui.openingAppId = '';
+        if (ui.active) m.redraw();
+      }
+    };
     ui.load = async (manual = false) => {
       if (ui.inFlight) {
         if (manual) {
@@ -273,11 +464,12 @@ export const ActorsSection = {
         if (!ui.active) return;
         m.redraw();
         if (moveFocus) requestAnimationFrame(() => {
-          const refresh = ui.root?.querySelector('.actor-space-refresh');
+          const refresh = ui.root?.querySelector('.actor-space-refresh--live');
           if (refresh instanceof HTMLElement) refresh.focus();
         });
       }
     };
+    void ui.loadCatalog();
     void ui.load();
   },
 
@@ -301,6 +493,7 @@ export const ActorsSection = {
    *   send: (msg: any) => Promise<any>,
    *   onActiveActorCount?: (count: number) => void,
    *   onOpenSession: (sessionId: string) => void|Promise<void>,
+   *   onOpenApps?: () => void,
    *   currentSessionId?: string|null,
    *   chatOwnedBySidePanel?: boolean,
    * } }} vnode
@@ -320,6 +513,7 @@ export const ActorsSection = {
       || String(a.root.session?.title ?? a.root.session?.sessionId)
         .localeCompare(String(b.root.session?.title ?? b.root.session?.sessionId)));
     const fabrics = rooms.map((room) => room.fabric);
+    const catalog = Array.isArray(ui.catalog) ? ui.catalog : [];
     const actorCount = fabrics.reduce((/** @type {number} */ sum, fabric) => sum + fabric.activeActors, 0);
     const boundCount = fabrics.reduce((/** @type {number} */ sum, fabric) => sum
       + fabric.nodes.filter((node) => node.variant === 'bound').length, 0);
@@ -338,22 +532,56 @@ export const ActorsSection = {
     return m('section.actor-space', { 'aria-labelledby': 'actor-space-title' }, [
       m('header.actor-space-hero', [
         m('.actor-space-hero-copy', [
-          m('span.actor-space-eyebrow', 'Live instance map'),
+          m('span.actor-space-eyebrow', 'Peerd Hub'),
           m('h1#actor-space-title', 'Actors'),
-          m('p', 'Every active orchestrator and isolated worker in this peerd instance, across every chat.'),
+          m('p', 'Your durable App actors, plus every live orchestrator and isolated worker in this peerd instance.'),
         ]),
         m('.actor-space-summary', { 'aria-label': 'Actor totals' }, [
+          m('.actor-space-stat', [m('strong', ui.catalog === null ? '…' : String(catalog.length)),
+            m('span', catalog.length === 1 ? 'App actor' : 'App actors')]),
           m('.actor-space-stat', [m('strong', String(roots.length)),
             m('span', roots.length === 1 ? 'orchestrator' : 'orchestrators')]),
           m('.actor-space-stat', [m('strong', String(actorCount)), m('span', 'isolated actors')]),
           m('.actor-space-stat', [m('strong', String(boundCount)), m('span', 'resource-bound')]),
         ]),
       ]),
+      m('section.hub-actor-catalog', { 'aria-labelledby': 'hub-my-actors-title' }, [
+        m('.hub-actor-catalog-head', [
+          m('div', [
+            m('span.actor-space-eyebrow', 'Durable definitions'),
+            m('h2#hub-my-actors-title', 'My Actors'),
+            m('p', 'Every App brings an actor. Chat with it, customize its manifest and code, or manage the App that owns it.'),
+          ]),
+          m('button.actor-space-refresh.actor-space-refresh--catalog', {
+            type: 'button', disabled: ui.catalogLoading,
+            'aria-label': 'Refresh App actors',
+            onclick: () => void ui.loadCatalog(),
+          }, ui.catalogLoading ? 'Refreshing…' : 'Refresh'),
+        ]),
+        ui.catalogError ? m('.actor-space-error', { role: 'alert' }, ui.catalogError) : null,
+        ui.catalog === null
+          ? m('.hub-actor-catalog-empty', ui.catalogLoading
+              ? [m('span.peerd-spinner.peerd-spinner--sm', { 'aria-hidden': 'true' }), 'Loading App actors…']
+              : 'App actors could not be loaded. Refresh to try again.')
+          : catalog.length
+            ? m('.hub-actor-grid', catalog.map((app) => appActorCard(app, ui, {
+                openApp: ui.openApp,
+                openApps: attrs.onOpenApps,
+              })))
+            : m('.hub-actor-catalog-empty',
+                'No durable actors yet. Create or install an App and its actor will appear here.'),
+      ]),
+      m('.actor-space-live-heading', [
+        m('span.actor-space-eyebrow', 'Runtime'),
+        m('h2', 'Live activity'),
+        m('p', 'Ephemeral, web, compute, and orchestrator actors appear here only while they are running.'),
+      ]),
       m('.actor-space-trust-line', [
         m('span.peerd-spinner.peerd-spinner--sm', { 'aria-hidden': 'true' }),
         m('span', 'Live from peerd runtime · worker boundaries are physical, access is server-resolved'),
-        m('button.actor-space-refresh', {
+        m('button.actor-space-refresh.actor-space-refresh--live', {
           type: 'button', disabled: ui.loading, onclick: () => void ui.load(true),
+          'aria-label': 'Refresh live actor activity',
         }, ui.loading ? 'Refreshing…' : 'Refresh'),
       ]),
       m('p.sr-only', { 'aria-live': 'polite', 'aria-atomic': 'true' },

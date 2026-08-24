@@ -463,7 +463,7 @@ export const LibrarySection = {
       ui.gitImportRef = '';
       ui.notice = opened?.ok
         ? `Imported ${reply.record?.name ?? 'App'} from Git and opened it with its bound actor.`
-        : `Imported ${reply.record?.name ?? 'App'} from Git. Open it from Library to attach its actor.`;
+        : `Imported ${reply.record?.name ?? 'App'} from Git. Open it from My Apps to attach its actor.`;
       LibrarySection.refresh(vnode);
     } catch {
       ui.gitImportOutcomeUnknown = true;
@@ -781,6 +781,12 @@ export const LibrarySection = {
   view(vnode) {
     const ui = vnode.state;
 
+    const intro = m('header.hub-section-heading', [
+      m('span.hub-section-eyebrow', 'Peerd Hub'),
+      m('h1', 'My Apps'),
+      m('p', 'Sovereign local applications, each with its own scoped actor. Open one to use its UI, chat with its actor, or customize its code.'),
+    ]);
+
     const header = m('div', { style: 'display:flex; align-items:center; gap:8px; margin:0 0 12px;' }, [
       m('p.muted', { style: 'margin:0; font-size:12px;' },
         ui.apps ? `${ui.apps.length} app${ui.apps.length === 1 ? '' : 's'}` : ''),
@@ -812,6 +818,7 @@ export const LibrarySection = {
     // it. Either way the next successful action clears ui.error.
     if (ui.apps === null) {
       return m('div', [
+        intro,
         header,
         ui.error ? m('p.error', { role: 'alert', 'aria-live': 'assertive' }, ui.error) : m('p.muted', 'Loading…'),
         ui.warning ? m('p.muted', { role: 'status', 'aria-live': 'polite' }, ui.warning) : null,
@@ -863,7 +870,7 @@ export const LibrarySection = {
       ui.gitImportOutcomeUnknown ? m('.library-repository-warning', {
         role: 'alert', 'aria-live': 'assertive',
       }, [
-        m('p', 'The previous clone is still unconfirmed. Refresh and inspect the Library before allowing another clone.'),
+        m('p', 'The previous clone is still unconfirmed. Refresh and inspect My Apps before allowing another clone.'),
         m('button.library-btn', {
           type: 'button',
           onclick: () => {
@@ -871,11 +878,11 @@ export const LibrarySection = {
             ui.error = null;
             m.redraw();
           },
-        }, 'I checked the Library; allow another clone'),
+        }, 'I checked My Apps; allow another clone'),
       ]) : null,
     ]) : null;
     if (ui.apps.length === 0) {
-      return m('div', [header, ...banners, gitImport, m('p.muted',
+      return m('div', [intro, header, ...banners, gitImport, m('p.muted',
         'No apps yet. Ask the agent to build one — it will appear here automatically.')]);
     }
 
@@ -893,6 +900,7 @@ export const LibrarySection = {
         || ((b.updatedAt ?? 0) - (a.updatedAt ?? 0)));
 
     return m('div', [
+      intro,
       header,
       ...banners,
       gitImport,

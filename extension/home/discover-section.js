@@ -295,7 +295,7 @@ export const DiscoverSection = () => {
 
     // the single trailing action (mirrors the prior row's branch ladder)
     let action;
-    if (mine) action = m('span.peerd-disc-done', 'in your Library');
+    if (mine) action = m('span.peerd-disc-done', 'in your Apps');
     else if (installed && updatable) action = m('button.disc-open', {
       disabled: state === 'updating' || uncertain,
       onclick: () => update(send, app, /** @type {string} */ (localId)),
@@ -314,6 +314,7 @@ export const DiscoverSection = () => {
         m('div', { style: 'flex:1; min-width:0;' }, [
           m('.disc-name', { title: label }, label),
           m('.disc-meta', mine ? 'by you' : `from …${short(app.publisher || app.from)}`),
+          m('.disc-meta', 'DWApp · includes an App actor'),
         ]),
       ]),
       updatable && !failed ? m('.disc-update-badge', { title: 'A newer version is available' }, '● update available') : null,
@@ -344,6 +345,11 @@ export const DiscoverSection = () => {
     /** @param {{ attrs: { send: Send } }} vnode */
     view(vnode) {
       const send = vnode.attrs.send;
+      const intro = m('header.hub-section-heading', [
+        m('span.hub-section-eyebrow', 'Peerd network'),
+        m('h1', 'Discover DWApps'),
+        m('p', 'Peer-distributed Apps that use the Peerd network as their backend. Installing one adds both the App and its scoped actor to your Hub.'),
+      ]);
 
       // Header mirrors the Library: a live count + a manual ↻ (spins while a
       // re-sync runs). The list also auto-polls every 4s underneath.
@@ -360,14 +366,14 @@ export const DiscoverSection = () => {
       ]);
 
       if (loading && !apps.length) {
-        return m('.peerd-disc', [header, m('.peerd-net-empty', 'Listening for apps your peers are running…')]);
+        return m('.peerd-disc', [intro, header, m('.peerd-net-empty', 'Listening for apps your peers are running…')]);
       }
       const errorBanner = error
         ? m('p.peerd-disc-err', { role: 'alert', 'aria-live': 'assertive' }, error)
         : null;
       if (!apps.length) {
-        return m('.peerd-disc', [header, errorBanner, error ? null : m('.peerd-net-empty',
-          'Nothing shared yet. Share an app from your Library, or ask the agent to build and '
+        return m('.peerd-disc', [intro, header, errorBanner, error ? null : m('.peerd-net-empty',
+          'Nothing shared yet. Share an app from My Apps, or ask the agent to build and '
           + 'share one, and it spreads to your peers. Or wait for one of theirs to arrive.')]);
       }
 
@@ -379,6 +385,7 @@ export const DiscoverSection = () => {
       });
 
       return m('.peerd-disc', [
+        intro,
         header,
         errorBanner,
         m('input.disc-search', {

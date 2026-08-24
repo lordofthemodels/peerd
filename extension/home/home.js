@@ -1,6 +1,6 @@
 // @ts-check
-// peerd — the home page. A standalone full-tab SPA (NOT the options page):
-// a left rail switches between the agent Chat and the Library / Discover /
+// peerd Hub. A standalone full-tab SPA (NOT the options page):
+// a left rail switches between the agent Chat and the Apps / Discover /
 // Network sections. The Chat is an EQUAL live view of the same SW session the
 // side panel shows (DESIGN-12): home connects a 'home' port and folds the SAME
 // pushes through the SHARED reduceChat, so switching between home and the side
@@ -415,7 +415,7 @@ const navItems = (showDweb) => [
   // recent-chats list + "New chat" column (ChatListPanel, ChatGPT-style).
   ...(sidePanelOpen ? [] : [{ id: 'chat', label: 'Chats', group: 'agent' }]),
   { id: 'actors', label: 'Actors', group: 'agent' },
-  { id: 'library', label: 'Library', group: 'create' },
+  { id: 'library', label: 'Apps', group: 'create' },
   { id: 'eval', label: 'Lab', group: 'create' },
   ...(showDweb ? [
     { id: 'discover', label: 'Discover', group: 'network' },
@@ -668,6 +668,7 @@ const content = (showDweb) => {
     onOpenSession: openActorSession,
     currentSessionId: currentState.session?.sessionId,
     chatOwnedBySidePanel: sidePanelOpen,
+    onOpenApps: () => navigateHome('library'),
   });
   if (activeView === 'library') return m(LibrarySection, { send, dweb: showDweb });
   if (activeView === 'eval') {
@@ -723,6 +724,7 @@ const HomeApp = {
       // (matches the side-panel header — both left-hug, no centering).
       m('.home-rail-mark', [
         m(Wordmark),
+        m('span.home-rail-product', 'Hub'),
         CHANNEL === 'preview'
           ? m('span.channel-badge.channel-badge--in', { title: 'peerd preview — dweb preview package' }, 'preview')
           : null,
