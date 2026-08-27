@@ -947,7 +947,16 @@ export const makeControllerTurnBridge = ({
             return unknown(run, 'tool execution preparation is invalid');
           }
           let argsDigest;
-          try { argsDigest = await digestArgs(prepared.args); }
+          let authorityCall;
+          try {
+            argsDigest = await digestArgs(prepared.args);
+            // why: hooks may rewrite arguments after the model-issued call is
+            // admitted. The original digest remains in baseBinding; exact
+            // domain authority binds the separately-digested effective args.
+            authorityCall = Object.freeze({
+              ...call, args: structuredClone(prepared.args),
+            });
+          }
           catch (cause) { release(); return failed(cause, true); }
           if (!DIGEST.test(argsDigest)) {
             release();
@@ -975,7 +984,7 @@ export const makeControllerTurnBridge = ({
             return failed('tool execution request is outside its manifest', true);
           }
           run.preparedExecutions.set(executionId, {
-            executionId, argsDigest, binding, call, custody: prepared.custody,
+            executionId, argsDigest, binding, call: authorityCall, custody: prepared.custody,
             deadlineAt, release, open: true, effectEntered: false, effectPending: 0,
             pendingIrreversible: 0, settledIrreversible: false,
             unknownIrreversible: false, policy: parsedRequest.policy,
@@ -2104,14 +2113,20 @@ export const makeControllerTurnBridge = ({
     authorize,
     handleKernelCall,
     runUserTurn,
-    close: () => {
+    close: async () => {
+      const cleanup = [];
       for (const run of runs.values()) {
         run.abort.abort();
         run.events.close();
-        void cleanupPrepared(run, 'tool-execution-kernel-closed');
+        cleanup.push(cleanupPrepared(run, 'tool-execution-kernel-closed'));
+        if (providerEgress?.closeOwner) {
+          cleanup.push(Promise.resolve().then(() =>
+            providerEgress.closeOwner(run.providerOwner)));
+        }
       }
       runs.clear();
       sessionGenerations.clear();
+      await Promise.allSettled(cleanup);
     },
     activeCount: () => runs.size,
   });
