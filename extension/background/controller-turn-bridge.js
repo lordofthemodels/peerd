@@ -169,6 +169,7 @@ const controllerCtx = (ctx) => {
  * @param {()=>number} [deps.now]
  * @param {ReturnType<import('./provider-egress-authority.js').createProviderEgressAuthority>}
  *   [deps.providerEgress]
+ * @param {number} [deps.cleanupTimeoutMs]
  */
 export const makeControllerTurnBridge = ({
   getClient,
@@ -179,6 +180,7 @@ export const makeControllerTurnBridge = ({
   toolManifest = CONTROLLER_AUTHORITY_MANIFEST,
   providerEgress,
   now = Date.now,
+  cleanupTimeoutMs = 250,
 }) => {
   /** @type {Map<string, any>} */
   const runs = new Map();
@@ -188,6 +190,34 @@ export const makeControllerTurnBridge = ({
       || typeof toolManifest.digest !== 'string' || !isRecord(toolManifest.tools)) {
     throw new TypeError('controller-authority-manifest-invalid');
   }
+  const cleanupFuseMs = Number.isFinite(cleanupTimeoutMs) && cleanupTimeoutMs > 0
+    ? Math.floor(cleanupTimeoutMs) : 250;
+  const boundedCleanup = (/** @type {Promise<unknown>} */ pending) =>
+    new Promise((resolve) => {
+      let finished = false;
+      const finish = (/** @type {unknown} */ value) => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timer);
+        resolve(value);
+      };
+      const timer = setTimeout(() => finish(undefined), cleanupFuseMs);
+      pending.then(finish, () => finish(undefined));
+    });
+  const closeProviderOwner = (/** @type {object} */ owner) => providerEgress?.closeOwner
+    ? boundedCleanup(Promise.resolve().then(() => providerEgress.closeOwner(owner)))
+    : Promise.resolve();
+  const openProviderCustody = async (
+    /** @type {any} */ run,
+    /** @type {()=>Promise<any>} */ open,
+  ) => {
+    const result = await open();
+    if (!run.signal.aborted) return result;
+    // why: Stop can close an owner while an admission is still awaiting the
+    // provider. Close again after the late stream becomes owner-visible.
+    await closeProviderOwner(run.providerOwner);
+    return { ok: false, code: 'turn-run-aborted', outcomeKnown: true };
+  };
 
   const executionCustody = (/** @type {any} */ entry) => {
     if (entry.pendingIrreversible > 0 || entry.unknownIrreversible === true) {
@@ -847,7 +877,8 @@ export const makeControllerTurnBridge = ({
             return failed('model egress unavailable', true);
           }
           run.modelToolCalls.clear();
-          return providerEgress.openInference(value, modelGrant(run));
+          return openProviderCustody(run, () =>
+            providerEgress.openInference(value, modelGrant(run)));
         }
         case 'turn.model.read-inference':
           return providerEgress
@@ -867,7 +898,8 @@ export const makeControllerTurnBridge = ({
             : failed('model egress unavailable', true);
         case 'turn.model.open-local':
           return providerEgress
-            ? providerEgress.openLocalGeneration(value, modelGrant(run))
+            ? openProviderCustody(run, () =>
+              providerEgress.openLocalGeneration(value, modelGrant(run)))
             : failed('local model egress unavailable', true);
         case 'turn.model.read-local':
           return providerEgress
@@ -2123,8 +2155,10 @@ export const makeControllerTurnBridge = ({
       localAbort.abort();
       ctx.signal?.removeEventListener?.('abort', onAbort);
       events.close();
-      await cleanupPrepared(run, 'tool-execution-controller-lost');
-      await providerEgress?.closeOwner(run.providerOwner);
+      await cleanupPrepared(run, 'tool-execution-controller-lost', {
+        detachSettlement: true,
+      });
+      await closeProviderOwner(run.providerOwner);
       runs.delete(runId);
       run.opaque.clear();
     }
@@ -2142,10 +2176,7 @@ export const makeControllerTurnBridge = ({
         await cleanupPrepared(run, 'tool-execution-kernel-closed', {
           detachSettlement: true,
         });
-        if (providerEgress?.closeOwner) {
-          providerCleanup.push(Promise.resolve().then(() =>
-            providerEgress.closeOwner(run.providerOwner)));
-        }
+        providerCleanup.push(closeProviderOwner(run.providerOwner));
       }
       runs.clear();
       sessionGenerations.clear();
