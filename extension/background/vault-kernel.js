@@ -833,7 +833,7 @@ const assemblyReport = () => Object.freeze({
       'runtime.onMessage': SEMANTIC_CUTOVER_SUMMARY.ready,
       'runtime.onConnect': true,
       'runtime.onInstalled': true,
-      'runtime.onUpdateAvailable': !!kernelUpdateCustody,
+      'runtime.onUpdateAvailable': kernelSelfHostedChrome && !!kernelUpdateCustody,
       'storage.session.onChanged': !!firefoxActorLifetime,
       'windows.onFocusChanged': true,
       'action.onClicked': true,
