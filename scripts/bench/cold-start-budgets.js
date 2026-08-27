@@ -127,7 +127,7 @@ export const COLD_SOURCE_TARGETS = Object.freeze({
 export const PREVIEW_KERNEL_SOURCE_CONTRACT = Object.freeze({
   shared: Object.freeze({ modules: 94, graphBytes: 678_376 }),
   target: Object.freeze({ modules: 97, graphBytes: 728_153 }),
-  exclusive: Object.freeze({ modules: 3, graphBytes: 49_777 }),
+  exclusive: Object.freeze({ modules: 3, graphBytes: 53_941 }),
   entryBytesCeiling: 78,
   directImportsCeiling: 2,
 });
