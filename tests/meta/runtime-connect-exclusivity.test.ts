@@ -42,7 +42,6 @@ describe('runtime Port receiver exclusivity', () => {
       .filter((path) => /\bonConnect\b/.test(stripComments(readFileSync(path, 'utf8'))));
     expect(offenders.map((path) => relative(EXTENSION_DIR, path))).toEqual([
       'background/vault-kernel-assembly.js',
-      'background/cold-kernel-capture.js',
       'background/cold-kernel-inventory.js',
       'background/vault-kernel.js',
     ]);

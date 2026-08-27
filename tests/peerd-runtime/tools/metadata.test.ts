@@ -22,9 +22,6 @@ import {
   projectControllerToolSurface,
 } from '../../../extension/peerd-runtime/controller-tool-projection.js';
 import {
-  clearTools, listTools, registerTool,
-} from '../../../extension/peerd-runtime/tools/registry.js';
-import {
   CONTROLLER_LOCAL_TOOL_NAMES,
 } from '../../../extension/peerd-runtime/controller-local-tools.js';
 import { CONTROLLER_ACTOR_TOOL_NAMES } from '../../../extension/peerd-runtime/controller-actor-tools.js';
@@ -118,19 +115,6 @@ describe('tool metadata authority', () => {
       } as any)).toEqual(resolveToolOrigins(policy.originRule, {
         url: 'https://example.com/a',
       }, { activeTab: { origin: 'https://active.example' } }));
-    }
-  });
-
-  test('registry accepts only the composed inventory without changing order', () => {
-    const previous = listTools();
-    try {
-      clearTools();
-      for (const tool of ALL_TOOLS) registerTool(tool as any);
-      expect(listTools().map((tool) => tool.name))
-        .toEqual(TOOL_METADATA_ORDER.filter((name) => !CONTROLLER_ONLY_TOOL_NAMES.has(name)));
-    } finally {
-      clearTools();
-      for (const tool of previous) registerTool(tool);
     }
   });
 

@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { dispatchToolCall } from '../../../extension/peerd-runtime/tools/local-tool-dispatcher.js';
 import { siteClientWriteTool } from '../../../extension/peerd-runtime/tools/defs/site-client-write.js';
-import { clearTools, registerTool } from '../../../extension/peerd-runtime/tools/registry.js';
+import {
+  clearTools, dispatchToolCall, registerTool,
+} from '../../../extension/tests/helpers/tool-dispatch-fixture.js';
 import { makeDispatchTracker } from '../../../extension/peerd-runtime/lifecycle/dispatch-tracking.js';
 import { createOperationLog } from '../../../extension/peerd-runtime/lifecycle/operation-log.js';
 import { OPERATION_STATES } from '../../../extension/peerd-runtime/lifecycle/operation-state.js';

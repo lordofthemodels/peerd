@@ -13,8 +13,9 @@
 
 import { describe, test, expect } from 'bun:test';
 import { runUserTurn } from '../../../extension/peerd-runtime/loop/agent-loop.js';
-import { dispatchToolCall } from '../../../extension/peerd-runtime/tools/local-tool-dispatcher.js';
-import { registerTool, clearTools } from '../../../extension/peerd-runtime/tools/registry.js';
+import {
+  clearTools, dispatchToolCall, registerTool,
+} from '../../../extension/tests/helpers/tool-dispatch-fixture.js';
 import { detectInterruptedTurn } from '../../../extension/peerd-runtime/loop/resume-detect.js';
 import { INITIAL_STATE, reduceChat } from '../../../extension/sidepanel/chat-reducer.js';
 

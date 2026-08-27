@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
 import { makeControllerTurnBridge } from '../../extension/background/controller-turn-bridge.js';
 import {
   createControllerTurnRuntime,
@@ -14,11 +14,6 @@ import {
   prepareToolCall as prepareRuntimeToolCall,
   settleToolCall as settleRuntimeToolCall,
 } from '../../extension/peerd-runtime/tools/dispatcher.js';
-import {
-  clearTools,
-  registerTool,
-} from '../../extension/peerd-runtime/tools/registry.js';
-import { registerMetadataInventory } from '../../extension/peerd-runtime/tools/metadata-registry.js';
 import { toToolDescriptor, projectToolAuthority } from '../../extension/peerd-runtime/tools/metadata/descriptor.js';
 import { getToolPolicy } from '../../extension/peerd-runtime/tools/metadata/policy.js';
 import { TOOL_EXECUTION_PROTOCOL } from '../../extension/shared/tool-execution-protocol.js';
@@ -131,14 +126,8 @@ const runHarness = async ({
   return { bridge, events, error };
 };
 
-afterEach(() => {
-  clearTools();
-  registerMetadataInventory([]);
-});
-
 describe('controller turn finite tool protocol', () => {
   test('executes now through real prepare, controller, and settle phases', async () => {
-    registerMetadataInventory();
     let legacy = 0;
     const toolContext = {
       audit: async () => {}, hooks: [], session: { sessionId: 'session-tool-protocol' },
@@ -182,7 +171,6 @@ describe('controller turn finite tool protocol', () => {
   });
 
   test('executes complete_goal through the exact goal authority operation', async () => {
-    registerMetadataInventory();
     const summaries: string[] = [];
     const toolContext = {
       audit: async () => {}, hooks: [], session: { sessionId: 'session-tool-protocol' },

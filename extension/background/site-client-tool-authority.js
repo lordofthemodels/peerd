@@ -97,7 +97,7 @@ export const createSiteClientToolAuthority = ({ call, ctx, signal }) => {
       if (read.unavailable) return { ok: false, error: 'site_clients_unavailable' };
       if (!read.record) return {
         ok: false,
-        error: `no_site_client: none stored for ${origin} — derive one first (site_capture + site_client_write), or just drive the page.`,
+        error: `no_site_client: none stored for ${origin} - derive one first (site_capture + site_client_write), or just drive the page.`,
       };
       if (abortSignal?.aborted) {
         return { ok: false, error: 'site_client_run_aborted: the turn stopped while loading the client' };
@@ -171,7 +171,7 @@ export const createSiteClientToolAuthority = ({ call, ctx, signal }) => {
       const answer = await ctx.confirm({
         tool: 'site_client_write', sideEffect: 'write', kind: 'site_client_write',
         proposal,
-        summary: `${proposal.op} site client ${origin} — persists ${proposal.bodyBytesAfter}B of `
+        summary: `${proposal.op} site client ${origin} - persists ${proposal.bodyBytesAfter}B of `
           + `RUNNABLE JS (was ${proposal.bodyBytesBefore}B) + ${proposal.dossier.endpoints.length} endpoint(s) `
           + `(+${proposal.endpointDelta.added}/−${proposal.endpointDelta.removed}). Review the module before allowing.`,
         origins: [origin], sessionId: ctx.session?.sessionId ?? null,

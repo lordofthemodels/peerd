@@ -8,8 +8,9 @@
 
 import { describe, it, expect } from '../../framework.js';
 import {
-  registerTool, clearTools, dispatchToolCall, GATES,
-} from '/peerd-runtime/index.js';
+  clearTools, dispatchToolCall, registerTool,
+} from '../../helpers/tool-dispatch-fixture.js';
+import { GATES } from '/peerd-runtime/index.js';
 
 /** @typedef {import('/shared/tool-types.js').ToolContext} ToolContext */
 /** @typedef {import('/shared/tool-types.js').Tool} Tool */

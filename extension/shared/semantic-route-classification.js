@@ -8,8 +8,8 @@ import {
 
 const KERNEL_SOURCES = new Set([
   'extension/background/routes/system-read.js',
-  'extension/background/routes/denylist.js',
-  'extension/background/routes/learned-origins.js',
+  'extension/background/kernel-denylist-policy.js',
+  'extension/background/settings-store.js',
   'extension/background/routes/vault.js',
   'extension/peerd-egress/fetch/origin-credential-routes.js',
   'extension/peerd-engine/vm-net/git-credential-routes.js',

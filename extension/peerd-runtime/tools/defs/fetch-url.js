@@ -196,7 +196,7 @@ export const fetchUrlTool = composeTool("fetch_url", {
       }
       // Spill-and-page for an oversized body (Hermes-style): the FULL text is
       // stored locally and the model sees a head+tail WINDOW plus the exact
-      // read_result paging call — instead of the old silent head-only slice
+      // read_result paging call - instead of the old silent head-only slice
       // that lost the tail without saying so. Falls back to the old slice when
       // the spill capability is absent (a ctx without resultStore).
       // When the caller named a query AND the body is prose (not JSON — BM25 is

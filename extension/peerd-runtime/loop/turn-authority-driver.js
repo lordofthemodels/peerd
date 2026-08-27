@@ -1,5 +1,5 @@
 // @ts-check
-// peerd-runtime/loop/turn-authority-driver — the service-worker turn shell.
+// peerd-runtime/loop/turn-authority-driver - the service-worker turn shell.
 // makeTurnAuthorityDriver(deps) returns { runAgentTurn, maybeAutoResume }; every
 // privileged IO is INJECTED (functional-core/imperative-shell) so the authority
 // orchestration can be unit-tested with fakes. Pure permission, spend-limit and
@@ -81,7 +81,7 @@ export const makeTurnAuthorityDriver = (/** @type {any} */ deps) => {
     getDenylist = () => [],
     // Prewalk (loop/prewalk.js), both optional so actor/test drivers stay
     // inert: reconcilePrewalk applies a pending planning→executing model swap
-    // (or restores stale state) at the TURN boundary — before pricing,
+    // (or restores stale state) at the TURN boundary - before pricing,
     // context-window and reasoning resolve, so all three see the swapped
     // model; maybePrewalkSwap is the per-tool-call gate that flips the phase.
     reconcilePrewalk = null,
@@ -91,7 +91,7 @@ export const makeTurnAuthorityDriver = (/** @type {any} */ deps) => {
     // Lifecycle recovery notices (lifecycle/boot.js drainNoticesFor):
     // read-once per session, folded into the leading <context> message so the
     // AGENT hears the same §14 semantic distinction the user's chat note
-    // carried — including the do-not-repeat instruction for outcome_unknown.
+    // carried - including the do-not-repeat instruction for outcome_unknown.
     // Optional so actor/test drivers stay inert.
     drainRecoveryNotices = null,
     // Live execution-boundary capability. Null keeps older test harnesses inert.
@@ -119,18 +119,18 @@ const runAgentTurn = async (/** @type {any} */ { userText, attachments = null, s
   await waitForActorIsolation();
   const lifecycleTurnId = crypto.randomUUID();
 
-  // Lazy session create — bind the chat to whatever provider/model the user
+  // Lazy session create - bind the chat to whatever provider/model the user
   // has configured (no provider is assumed on a fresh install; see
   // ensureActiveProvider below). targetSessionId
   // re-enters a SPECIFIC parent session for an async-actor reintegration
-  // (DESIGN-11) WITHOUT touching currentSessionId — never switch the user's
+  // (DESIGN-11) WITHOUT touching currentSessionId - never switch the user's
   // active view (DECISIONS #20). The lazy-create path below only runs for a
   // genuinely fresh active chat (no target, no current).
   let sessionId = targetSessionId ?? await sessionCache.sessionGet('currentSessionId');
   if (!sessionId) {
     // ensureActiveProvider (async): when the user hasn't explicitly chosen a
     // provider, bind this fresh chat to the first USABLE one (keyed-with-key, or
-    // a reachable keyless daemon) instead of a keyless-Anthropic guess — matching
+    // a reachable keyless daemon) instead of a keyless-Anthropic guess - matching
     // what the model picker shows. No-op (returns the explicit choice) when a
     // provider is already selected, so the common path adds no probes.
     const ap = await ensureActiveProvider();
@@ -150,12 +150,12 @@ const runAgentTurn = async (/** @type {any} */ { userText, attachments = null, s
   }
 
   // Claim THIS session's turn slot. If this chat is already streaming,
-  // the claim aborts that turn first (steer-live — the loop's catch-
+  // the claim aborts that turn first (steer-live - the loop's catch-
   // AbortError path persists the partial with stopReason='aborted');
   // turns streaming in OTHER chats are untouched.
   const { controller: abortController, release: releaseTurnSlot } = turnLease ?? turnSlots.claim(sessionId);
 
-  // DESIGN-17: resolve the session kind ONCE (authoritative, persisted — robust
+  // DESIGN-17: resolve the session kind ONCE (authoritative, persisted - robust
   // even when re-driven by auto-resume). An actor turn runs the SAME wrapper
   // (cost/clamp/scheduler/key/egress below) but a kind-aware per-turn SETUP: no
   // user-tab/memory context, an actor-only descriptor list + tuned prompt, the
@@ -163,10 +163,10 @@ const runAgentTurn = async (/** @type {any} */ { userText, attachments = null, s
   let turnSession = sessionId ? await sessions.get(sessionId) : null;
   // Prewalk turn-boundary reconcile: apply a pending executor swap (so THIS
   // turn's model/pricing/window all read the executor), or restore a stale
-  // planner (a run that died without its run-end restore). Best-effort — a
+  // planner (a run that died without its run-end restore). Best-effort - a
   // reconcile failure runs the turn on the unreconciled record. Two disjoint
   // paths: the goal-run reconcile for a CHAT session, and the engine-actor
-  // reconcile for an ENGINE actor (VM/Notebook/App) — the actor swaps to its
+  // reconcile for an ENGINE actor (VM/Notebook/App) - the actor swaps to its
   // cheap executor from its second turn onward. A web/dweb/spawned actor
   // carries no prewalk and is untouched.
   if (turnSession?.prewalk) {
@@ -215,13 +215,13 @@ const runAgentTurn = async (/** @type {any} */ { userText, attachments = null, s
   const turnNow = Date.now();
   await sessionCache.sessionSet(TURN_AT_KEY, turnNow);
 
-  // Always-loaded memory block (V1.5). Keyed by the active tab origin —
+  // Always-loaded memory block (V1.5). Keyed by the active tab origin -
   // peerd's "project" workspace is the browsing context, not a file
   // tree. loadAlwaysLoaded fetches only the user + this-workspace docs
   // and budget-trims to < ~200 lines; subtree memory stays on-demand.
   let memoryBlock = '';
   // Ephemeral "reorientation" context: the web page the user is looking at when
-  // they sent this message. Only a REAL web page counts — on home (an extension
+  // they sent this message. Only a REAL web page counts - on home (an extension
   // page) or any non-http tab there's nothing to reorient to, so the block
   // vanishes (the user's "back on home → gone" requirement, by construction).
   // Re-derived per turn from the live active tab; never persisted to history.
@@ -239,7 +239,7 @@ const runAgentTurn = async (/** @type {any} */ { userText, attachments = null, s
     console.warn('[sw] memory load failed', e);
   }
   // Progressive disclosure, cheap half: build the skill DESCRIPTIONS
-  // block once per turn (names + one-line descriptions only — bodies stay
+  // block once per turn (names + one-line descriptions only - bodies stay
   // on disk until load_skill fetches one). Collapses to '' when no skills
   // are installed, so the prompt placeholder costs nothing.
   const skillsBlock = await skillRegistry.describeForPrompt().catch((/** @type {any} */ e) => {
@@ -253,7 +253,7 @@ const runAgentTurn = async (/** @type {any} */ { userText, attachments = null, s
   // system string stays byte-stable and its prefix caches.
   // Residual invalidator: memoryBlock (above) is keyed to the LIVE foreground
   // origin, so the system prefix is byte-stable per (session x foreground
-  // workspace) — a mid-session origin switch re-renders the memory block and
+  // workspace) - a mid-session origin switch re-renders the memory block and
   // costs one cache write before it caches again. Acceptable; the volatile
   // seconds-clock (the real per-turn bust) is what moved out.
   // Interruption-recovery notices ride the same per-turn context message:
@@ -285,22 +285,22 @@ const runAgentTurn = async (/** @type {any} */ { userText, attachments = null, s
     actorIsolation: actorIsolationForModelStep,
   });
 
-  // Tool descriptors passed to the provider — name, description, and
+  // Tool descriptors passed to the provider - name, description, and
   // JSON-schema. The Anthropic adapter rewrites these into Anthropic's
   // `tools` array shape.
   //
   // EXPOSURE CUTOVER: the MAIN agent's browser surface is message_actor (+
   // actor_list/open_tab). The low-level DOM/page tools are hidden here so a11y
-  // trees, refs, and raw page content never enter the main context — they're
+  // trees, refs, and raw page content never enter the main context - they're
   // the web actor's, reached only by messaging a tab's actor. The tools stay
-  // REGISTERED (listTools is full); the actor narrows from the full set via
-  // getToolDescriptors. This filter is main-turn-only. See tools/exposure.js.
+  // available in the sealed semantic host; the actor narrows that descriptor
+  // surface by type. This filter is main-turn-only. See tools/exposure.js.
   //
-  // SECOND cut: the session's tool MANIFEST (/tools — tools/manifests.js).
+  // SECOND cut: the session's tool MANIFEST (/tools - tools/manifests.js).
   // Intersecting here means the model never SEES an excluded tool; the
   // exposure gate re-refuses by name at dispatch (buildToolContext feeds it
   // the same record), so the descriptor filter is UX, the gate is the wall.
-  // Re-read per turn so a mid-chat /tools change applies on the next turn —
+  // Re-read per turn so a mid-chat /tools change applies on the next turn -
   // the same freshness contract getSystemPrompt keeps for /system.
   const manifestSession = await sessions.get(sessionId);
   const turnPermission = await resolvePermission(manifestSession);
@@ -422,7 +422,7 @@ const runAgentTurn = async (/** @type {any} */ { userText, attachments = null, s
       },
     }) : null;
   // why: the loop's concurrent-dispatch scheduler partitions a multi-tool
-  // turn by the SAME decideAction policy the dispatcher enforces — READ-
+  // turn by the SAME decideAction policy the dispatcher enforces - READ-
   // class calls (which never confirm) may run concurrently; anything that
   // writes or would need a confirmation round-trip stays serial, so two
   // side effects can't interleave and confirm modals never stack.
@@ -439,18 +439,18 @@ const runAgentTurn = async (/** @type {any} */ { userText, attachments = null, s
   let lastSession = null;
   /** @type {{ messages: any[], usage: any } | null} */
   let turnSnapshot = null;
-  // Turn outcome, returned so an outer driver (goal mode — loop/goal-runner.js)
+  // Turn outcome, returned so an outer driver (goal mode - loop/goal-runner.js)
   // can tell a clean turn from a failed/aborted one instead of blindly
   // re-entering. lastStopReason is captured BEFORE the panel guard below (the
   // 'stop' case in the switch only runs when the UI is connected).
   let lastStopReason = null;
   let turnOk = true;
-  // Cost/usage accumulation for this turn (feature 06) — the fold/persist/
+  // Cost/usage accumulation for this turn (feature 06) - the fold/persist/
   // push/halt logic lives in makeTurnCostTracker (peerd-runtime/cost); the
   // SW supplies the IO: persist via sessions.setCost, the live meter via
   // the side-panel port, and the hard-limit halt via THIS turn's
   // AbortController (same clean-abort path as Stop / steer-live, so the
-  // loop unwinds through its existing branch — persists partial, yields
+  // loop unwinds through its existing branch - persists partial, yields
   // stopReason='aborted').
   // why: reuse the record resolved at turn start instead of reading the
   // session again at the accounting boundary.
@@ -487,15 +487,15 @@ const runAgentTurn = async (/** @type {any} */ { userText, attachments = null, s
     for await (const ev of runUserTurn({
       sessionId,
       userText,
-      // why: a reintegration wake (DESIGN-11) rides a synthetic user turn —
+      // why: a reintegration wake (DESIGN-11) rides a synthetic user turn -
       // hidden from the chat UI; the normal send path passes synthetic=false.
       synthetic,
       // why: an actor's reply-wake carries WHO replied so the chat can render
-      // it as its own attributed bubble — `synthetic` alone also marks hidden
+      // it as its own attributed bubble - `synthetic` alone also marks hidden
       // plumbing turns (resume/truncation nudges) and can't be un-hidden.
       ...(actorReply ? { actorReply } : {}),
       // why: auto-resume (maybeAutoResume) re-drives a turn the SW reclaimed
-      // mid-flight — no new user message; the loop continues the persisted
+      // mid-flight - no new user message; the loop continues the persisted
       // history. Normal sends pass resume=false.
       resume,
       // design 01: the per-turn ephemeral <context> message (temporal + active
@@ -550,12 +550,12 @@ const runAgentTurn = async (/** @type {any} */ { userText, attachments = null, s
       // The sealed controller prices each provider usage event; the SW only
       // validates/folds that bounded amount and retains spend-limit custody.
       pricingOverrides: settingsStore.get().pricingOverrides,
-      // why: one-shot actor delegations (message_actor oneShot) — after the first
+      // why: one-shot actor delegations (message_actor oneShot) - after the first
       // clean tool round the loop synthesizes the reply from the result and stops,
       // skipping the redundant summarize inference. false for every normal turn.
       oneShot,
     })) {
-      // Cost telemetry (feature 06) — handled BEFORE the panel guard so
+      // Cost telemetry (feature 06) - handled BEFORE the panel guard so
       // the persisted session total and the hard-limit halt stay correct
       // even when the side panel is closed (a long agentic turn can run
       // with the panel hidden). Pricing is computed from the LOCAL table
@@ -567,7 +567,7 @@ const runAgentTurn = async (/** @type {any} */ { userText, attachments = null, s
       }
       // Capture the final stop reason for the return value BEFORE the panel
       // guard (the switch's 'stop' case is panel-only). 'aborted' here = Stop /
-      // steer / a spend-limit halt — an outer goal loop must not re-drive it.
+      // steer / a spend-limit halt - an outer goal loop must not re-drive it.
       if (ev.type === 'stop') lastStopReason = ev.stopReason;
       // The production loop turns provider failures into stream events. Fold
       // their outcome before the UI guard so background and Goal turns fail
@@ -655,7 +655,7 @@ const runAgentTurn = async (/** @type {any} */ { userText, attachments = null, s
       }
     }
   } catch (e) {
-    // Loop-level failure — typed errors get clean labels; anything else
+    // Loop-level failure - typed errors get clean labels; anything else
     // surfaces as a generic provider error message.
     const detail = /** @type {{code?:string,outcomeKnown?:boolean,retryable?:boolean}} */ (e);
     const providerFailure = providerFailureFrom(detail?.code);
@@ -718,7 +718,7 @@ const runAgentTurn = async (/** @type {any} */ { userText, attachments = null, s
     // clear its own slot, never the newer turn that replaced it.
     releaseTurnSlot();
     // Drain any queued trim-summary enrichment now that the stream is
-    // done — fire-and-forget, mechanical fallback already persisted, so
+    // done - fire-and-forget, mechanical fallback already persisted, so
     // a failure here costs nothing but summary quality.
     trimEnricher.drain(sessionId)
       .catch((/** @type {any} */ e) => console.warn('[sw] trim enrichment failed', e));
@@ -738,7 +738,7 @@ const runAgentTurn = async (/** @type {any} */ { userText, attachments = null, s
 // Per-SW-lifetime dedupe for auto-resume: the interrupted message id we've
 // already resumed for each session, so reopening a chat repeatedly doesn't
 // re-fire the same dead turn. A FRESH interruption (new markerId) resumes
-// again. The map is empty on a cold SW — which is exactly right: a wake is
+// again. The map is empty on a cold SW - which is exactly right: a wake is
 // precisely when we most want to resume the turn the eviction killed.
 const autoResumedMarkers = new Map();
 
@@ -755,7 +755,7 @@ const maybeAutoResume = async (sessionId) => {
   try {
     if (!settingsStore.get().autoResumeInterruptedTurns) return;
     if (!sessionId || vault.isLocked()) return;
-    // Don't race a live turn — the loop is mid-stream, not interrupted.
+    // Don't race a live turn - the loop is mid-stream, not interrupted.
     if (turnSlots.isBusy(sessionId)) return;
     // Don't double-drive a session a Goal run owns: goalRunner.resume() re-drives
     // its OWN interrupted turn after an SW respawn, so auto-resume firing for the
@@ -772,7 +772,7 @@ const maybeAutoResume = async (sessionId) => {
       sessionId,
       details: { reason: verdict.reason },
     }).catch(() => {});
-    postChatNote('Resuming the previous turn — it was interrupted before it finished.');
+    postChatNote('Resuming the previous turn - it was interrupted before it finished.');
     // resume:true → no new user message; the loop continues the persisted
     // history (resume notes + orphan-repaired tool results make it coherent).
     // Passing sessionId as the target re-enters THIS session without touching

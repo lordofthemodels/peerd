@@ -183,7 +183,7 @@ const withAsyncBrowserChildPolicyNotices = (result, notices) => {
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('not-object');
     content = JSON.stringify({ ...parsed, ...asyncFields }, null, 2);
   } catch {
-    content = `${content}${content ? '\n\n' : ''}[ASYNC HOST POLICY — PRIOR ACTION]\n`
+    content = `${content}${content ? '\n\n' : ''}[ASYNC HOST POLICY - PRIOR ACTION]\n`
       + 'A child-browser outcome from an earlier action arrived after that action settled. '
       + 'It is not an outcome of this tool call. No destination details were exposed.\n'
       + `Receipts: ${JSON.stringify(browserAsyncPolicies)}`;

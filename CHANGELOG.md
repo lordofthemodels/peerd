@@ -10,6 +10,20 @@ and storage formats may move until the surface stabilizes.
 
 ## [Unreleased]
 
+### Changed
+
+- Model-facing tool descriptors and implementations now have one canonical
+  sealed-controller architecture. The service worker retains lifecycle policy
+  and finite named browser, storage, network, credential, and actor operations.
+- Oversized tool results use one session-bound `read_result` pager.
+
+### Removed
+
+- Removed the superseded mutable tool registry and local dispatcher, along with
+  unreachable background control-plane modules left behind by the kernel cutover.
+- Removed `request_review`, the direct page-evaluation tools, the toolbox
+  subsystem, `wait_until`, and `dweb_guide`.
+
 ## [0.7.3] - 2026-08-18
 
 ### Added

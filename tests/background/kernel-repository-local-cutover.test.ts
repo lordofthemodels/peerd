@@ -303,10 +303,8 @@ describe('repository/local production composition', () => {
   test('removes the broad route roots and keeps Firefox repository ownership private', async () => {
     const vault = readFileSync(join(EXTENSION_DIR, 'background/vault-kernel.js'), 'utf8');
     expect(vault).not.toContain("import('./kernel-local-routes.js')");
-    expect(vault).not.toContain("import('./kernel-repository-read-routes.js')");
     const runtime = await graph('background/kernel-semantic-runtime.js');
     expect(runtime.has('background/kernel-local-routes.js')).toBe(false);
-    expect(runtime.has('background/kernel-repository-read-routes.js')).toBe(false);
     const firefox = await graph('background/kernel-firefox-addon.js');
     expect(firefox.has('background/repository-local-client.js')).toBe(false);
     expect(readFileSync(join(EXTENSION_DIR, 'background/kernel-firefox-addon.js'), 'utf8'))

@@ -10,16 +10,15 @@ import { createOperationLog } from '../../../extension/peerd-runtime/lifecycle/o
 import { OPERATION_STATES } from '../../../extension/peerd-runtime/lifecycle/operation-state.js';
 import { classifyFailure } from '../../../extension/peerd-runtime/observability/failure-classify.js';
 import {
-  registerTool, clearTools,
-} from '../../../extension/peerd-runtime/tools/registry.js';
-import {
   getToolDescriptor as getMetadataToolDescriptor,
+  clearTools,
+  dispatchToolCall,
   registerMetadataInventory,
-} from '../../../extension/peerd-runtime/tools/metadata-registry.js';
+  registerTool,
+} from '../../../extension/tests/helpers/tool-dispatch-fixture.js';
 import {
   prepareToolCall, settleToolCall,
 } from '../../../extension/peerd-runtime/tools/dispatcher.js';
-import { dispatchToolCall } from '../../../extension/peerd-runtime/tools/local-tool-dispatcher.js';
 import { retryClassForTool } from '../../../extension/peerd-runtime/lifecycle/tool-retry-class.js';
 import {
   executeControllerRepositoryTool,

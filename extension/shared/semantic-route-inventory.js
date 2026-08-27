@@ -357,28 +357,28 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
     "channels": [
       "preview"
     ],
-    "source": "extension/background/routes/contributor-metrics.js"
+    "source": "extension/offscreen/semantic-routes/contributor.js"
   },
   {
     "route": "contributor/enable",
     "channels": [
       "preview"
     ],
-    "source": "extension/background/routes/contributor-metrics.js"
+    "source": "extension/offscreen/semantic-routes/contributor.js"
   },
   {
     "route": "contributor/feedback",
     "channels": [
       "preview"
     ],
-    "source": "extension/background/routes/contributor-metrics.js"
+    "source": "extension/offscreen/semantic-routes/contributor.js"
   },
   {
     "route": "contributor/status",
     "channels": [
       "preview"
     ],
-    "source": "extension/background/routes/contributor-metrics.js"
+    "source": "extension/offscreen/semantic-routes/contributor.js"
   },
   {
     "route": "cost/total",
@@ -402,7 +402,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/denylist.js"
+    "source": "extension/background/kernel-denylist-policy.js"
   },
   {
     "route": "denylist/list",
@@ -410,7 +410,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/denylist.js"
+    "source": "extension/background/kernel-denylist-policy.js"
   },
   {
     "route": "denylist/remove",
@@ -418,7 +418,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/denylist.js"
+    "source": "extension/background/kernel-denylist-policy.js"
   },
   {
     "route": "dweb/app-install",
@@ -658,7 +658,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/hooks.js"
+    "source": "extension/background/kernel-administrative-control.js"
   },
   {
     "route": "hooks/remove",
@@ -666,7 +666,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/hooks.js"
+    "source": "extension/background/kernel-administrative-control.js"
   },
   {
     "route": "hooks/save",
@@ -674,7 +674,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/hooks.js"
+    "source": "extension/background/kernel-administrative-control.js"
   },
   {
     "route": "hooks/toggle",
@@ -682,7 +682,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/hooks.js"
+    "source": "extension/background/kernel-administrative-control.js"
   },
   {
     "route": "import/apply",
@@ -706,7 +706,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/learned-origins.js"
+    "source": "extension/background/settings-store.js"
   },
   {
     "route": "learned/forget",
@@ -714,7 +714,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/learned-origins.js"
+    "source": "extension/background/settings-store.js"
   },
   {
     "route": "learned/list",
@@ -722,7 +722,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/learned-origins.js"
+    "source": "extension/background/settings-store.js"
   },
   {
     "route": "lifecycle/assert-opfs-writable",
@@ -738,7 +738,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/local-model.js"
+    "source": "extension/background/kernel-demand-plane.js"
   },
   {
     "route": "local-model/init",
@@ -746,7 +746,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/local-model.js"
+    "source": "extension/background/kernel-demand-plane.js"
   },
   {
     "route": "local-model/probe",
@@ -754,7 +754,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/local-model.js"
+    "source": "extension/background/kernel-demand-plane.js"
   },
   {
     "route": "local-model/status",
@@ -762,7 +762,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/local-model.js"
+    "source": "extension/background/kernel-demand-plane.js"
   },
   {
     "route": "memory/delete",
@@ -770,7 +770,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/memory.js"
+    "source": "extension/offscreen/semantic-routes/memory.js"
   },
   {
     "route": "memory/deleteAll",
@@ -778,7 +778,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/memory.js"
+    "source": "extension/offscreen/semantic-routes/memory.js"
   },
   {
     "route": "memory/export",
@@ -786,7 +786,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/memory.js"
+    "source": "extension/background/kernel-memory-authority.js"
   },
   {
     "route": "memory/init",
@@ -794,7 +794,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/memory.js"
+    "source": "extension/background/kernel-memory-authority.js"
   },
   {
     "route": "memory/suggestions",
@@ -802,7 +802,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/memory.js"
+    "source": "extension/offscreen/semantic-routes/memory.js"
   },
   {
     "route": "memory/suggestions/approve",
@@ -810,7 +810,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/memory.js"
+    "source": "extension/offscreen/semantic-routes/memory.js"
   },
   {
     "route": "memory/suggestions/dismiss",
@@ -818,7 +818,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/memory.js"
+    "source": "extension/offscreen/semantic-routes/memory.js"
   },
   {
     "route": "memory/write",
@@ -826,7 +826,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/memory.js"
+    "source": "extension/offscreen/semantic-routes/memory.js"
   },
   {
     "route": "models/options",
@@ -834,7 +834,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/providers.js"
+    "source": "extension/background/kernel-demand-plane.js"
   },
   {
     "route": "onboarding/complete",
@@ -842,7 +842,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/memory.js"
+    "source": "extension/background/vault-kernel-core.js"
   },
   {
     "route": "openrouter/models",
@@ -850,7 +850,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/providers.js"
+    "source": "extension/background/kernel-demand-plane.js"
   },
   {
     "route": "origin-cred/delete",
@@ -980,7 +980,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/providers.js"
+    "source": "extension/background/kernel-demand-plane.js"
   },
   {
     "route": "provider/status",
@@ -988,7 +988,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/providers.js"
+    "source": "extension/offscreen/semantic-routes/providers.js"
   },
   {
     "route": "provider/test",
@@ -996,7 +996,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/providers.js"
+    "source": "extension/background/kernel-demand-plane.js"
   },
   {
     "route": "repository/kernel-fetch",
@@ -1140,7 +1140,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/skills.js"
+    "source": "extension/background/kernel-administrative-control.js"
   },
   {
     "route": "skills/installLocal",
@@ -1148,7 +1148,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/skills.js"
+    "source": "extension/background/kernel-administrative-control.js"
   },
   {
     "route": "skills/installManifest",
@@ -1156,7 +1156,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/skills.js"
+    "source": "extension/background/kernel-administrative-control.js"
   },
   {
     "route": "skills/list",
@@ -1164,7 +1164,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/skills.js"
+    "source": "extension/background/kernel-administrative-control.js"
   },
   {
     "route": "skills/remove",
@@ -1172,7 +1172,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/skills.js"
+    "source": "extension/background/kernel-administrative-control.js"
   },
   {
     "route": "skills/setEnabled",
@@ -1180,7 +1180,7 @@ export const SEMANTIC_ROUTE_INVENTORY = Object.freeze([
       "store",
       "preview"
     ],
-    "source": "extension/background/routes/skills.js"
+    "source": "extension/background/kernel-administrative-control.js"
   },
   {
     "route": "state/get",

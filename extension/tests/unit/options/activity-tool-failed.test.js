@@ -11,7 +11,9 @@
 
 import m from '/vendor/mithril/mithril.js';
 import { describe, it, expect } from '../../framework.js';
-import { registerTool, clearTools, dispatchToolCall } from '/peerd-runtime/index.js';
+import {
+  clearTools, dispatchToolCall, registerTool,
+} from '../../helpers/tool-dispatch-fixture.js';
 import { createAuditLog, idb } from '/peerd-egress/index.js';
 import { ActivityView } from '/options/sections/activity.js';
 

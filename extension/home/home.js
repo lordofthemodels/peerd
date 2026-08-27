@@ -740,9 +740,9 @@ const HomeApp = {
     // the first-run "meet your peer" funnel gates the experience right here —
     // before any navigation — and lifts itself when the SW's onboardingComplete
     // latch flips on the next state push. It deliberately does NOT live in the
-    // side panel, and the panel is a front door of its own, so the SW closes
-    // the latch for any install that already has chat history
-    // (background/onboarding-reconcile.js). Net: the funnel only ever greets a
+    // side panel, and the panel is a front door of its own. The authority
+    // kernel closes the latch for any install that already has chat history.
+    // Net: the funnel only ever greets a
     // genuinely fresh install; a panel-first user who clicks Home mid-use lands
     // on home, never on a surprise re-onboarding.
     if (needsOnboarding(currentState)) {

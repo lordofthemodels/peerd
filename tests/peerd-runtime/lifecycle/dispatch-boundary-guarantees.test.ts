@@ -15,8 +15,9 @@ import { OPERATION_STATES } from '../../../extension/peerd-runtime/lifecycle/ope
 import { confirmationSatisfies } from '../../../extension/peerd-runtime/lifecycle/confirmation.js';
 import { retryClassForTool } from '../../../extension/peerd-runtime/lifecycle/tool-retry-class.js';
 import { decideRecovery } from '../../../extension/peerd-runtime/lifecycle/retry-class.js';
-import { registerTool, clearTools } from '../../../extension/peerd-runtime/tools/registry.js';
-import { dispatchToolCall } from '../../../extension/peerd-runtime/tools/local-tool-dispatcher.js';
+import {
+  clearTools, dispatchToolCall, registerTool,
+} from '../../../extension/tests/helpers/tool-dispatch-fixture.js';
 import { fromOpenAiStream } from '../../../extension/peerd-provider/format/from-openai.js';
 
 const S = OPERATION_STATES;

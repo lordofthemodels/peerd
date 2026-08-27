@@ -260,8 +260,6 @@ test('native entry uses one identity and target-exact kernel custody', async () 
   expect(modules).toContain('background/cold-kernel-inventory.js');
   expect(modules).toContain('background/kernel-cold-receipts.js');
   expect(modules).not.toContain('background/kernel-recovery-registry.js');
-  expect(modules).not.toContain('background/cold-listener-fan-in.js');
-  expect(modules).not.toContain('background/cold-kernel-capture.js');
   expect(modules).not.toContain('background/kernel-port-router.js');
   expect(modules).toContain('background/kernel-port-owners.js');
   expect(modules).toContain('background/kernel-front-door.js');

@@ -36,8 +36,8 @@ const directOwnerToken = (route: string, sourceName: string) => {
     return null;
   }
   if (sourceName === 'extension/background/routes/system-read.js') return 'makeSystemReadRoutes';
-  if (sourceName === 'extension/background/routes/denylist.js') return 'makeKernelDenylistRoutes';
-  if (sourceName === 'extension/background/routes/learned-origins.js') return 'makeKernelLearnedOriginRoutes';
+  if (sourceName === 'extension/background/kernel-denylist-policy.js') return 'makeKernelDenylistRoutes';
+  if (sourceName === 'extension/background/settings-store.js') return 'makeKernelLearnedOriginRoutes';
   if (sourceName === 'extension/background/routes/settings.js') return 'makeKernelSettingsRoutes';
   if (sourceName === 'extension/background/routes/vault.js') return 'makeVaultKernelRoutes';
   if (sourceName === 'extension/peerd-engine/vm-net/git-credential-routes.js') {
@@ -50,7 +50,7 @@ const directOwnerToken = (route: string, sourceName: string) => {
   if (sourceName === 'extension/background/routes/session-mutations.js') {
     return 'makeKernelSessionTurnRoutes';
   }
-  if (sourceName === 'extension/background/routes/memory.js') return "'onboarding/complete'";
+  if (sourceName === 'extension/background/vault-kernel-core.js') return "'onboarding/complete'";
   if (sourceName === 'extension/background/vault-kernel.js') {
     return route === 'confirm/answer' ? '...confirmation.routes' : "'repository/kernel-fetch'";
   }

@@ -142,7 +142,6 @@ describe('kernel turn ownership boundaries', () => {
       'peerd-runtime/controller-tools.js',
       'peerd-runtime/semantic.js',
       'peerd-runtime/site-clients/digest.js',
-      'peerd-runtime/tools/registry.js',
     ]);
 
     expect([...modules].filter((module) =>
@@ -154,7 +153,6 @@ describe('kernel turn ownership boundaries', () => {
     const authorityModules = await modulesFor('background/kernel-turn-live-factories.js');
     for (const module of [
       'peerd-runtime/controller-tool-projection.js',
-      'peerd-runtime/tools/metadata-registry.js',
       'peerd-runtime/tools/metadata/catalog.js',
     ]) expect(authorityModules.has(module), `authority graph imports ${module}`).toBe(false);
 
