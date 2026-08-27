@@ -581,9 +581,16 @@ export const makeSemanticControllerClient = ({
   },
 }) => {
   if (typeof fetchFn !== 'function'
+      || typeof offscreenUrl !== 'string'
       || !Number.isFinite(connectTimeoutMs) || connectTimeoutMs <= 0
       || !Number.isFinite(promptLoadTimeoutMs) || promptLoadTimeoutMs <= 0) {
     throw new TypeError('semantic controller asset reader is required');
+  }
+  const runtimeRoot = new URL(browser.runtime.getURL(''));
+  const controllerHostUrl = new URL(offscreenUrl, runtimeRoot);
+  if (controllerHostUrl.protocol !== runtimeRoot.protocol
+      || controllerHostUrl.host !== runtimeRoot.host) {
+    throw new TypeError('semantic controller host must belong to this extension');
   }
   const hasTurnAuthority = typeof authorizeTurnCall === 'function'
     && typeof handleTurnKernelCall === 'function';
@@ -714,7 +721,7 @@ export const makeSemanticControllerClient = ({
         ? handleControllerKernelCall : undefined,
       handshakeTimeoutMs: handshakeMs,
       findHost: async () => selectExactControllerHost(
-        await listWindowClients(), browser.runtime.getURL(offscreenUrl),
+        await listWindowClients(), controllerHostUrl.href,
       ),
     });
     try {

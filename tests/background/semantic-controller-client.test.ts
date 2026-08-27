@@ -188,7 +188,9 @@ describe('production semantic controller slice', () => {
     const semantic = makeSemanticControllerClient({
       browser: { runtime: { getURL: (path: string) => `chrome-extension://test/${path}` } },
       ensureOffscreen: async () => { ensures += 1; },
-      offscreenUrl: 'offscreen/offscreen.html',
+      // Production passes the already-resolved URL from vault-kernel. A
+      // second runtime.getURL() here used to make the real host undiscoverable.
+      offscreenUrl,
       firefoxDirect: false,
       dwebEnabled: true,
       fetchFn,
