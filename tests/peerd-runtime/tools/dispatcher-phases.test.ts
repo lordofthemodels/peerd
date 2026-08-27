@@ -4,16 +4,14 @@ import {
   prepareToolCall,
   settleToolCall,
 } from '../../../extension/peerd-runtime/tools/dispatcher.js';
-import { dispatchToolCall } from '../../../extension/peerd-runtime/tools/local-tool-dispatcher.js';
 import {
   clearTools,
-  getTool,
-  registerTool,
-} from '../../../extension/peerd-runtime/tools/registry.js';
-import {
+  dispatchToolCall,
   getToolDescriptor as getMetadataToolDescriptor,
+  getTool,
   registerMetadataInventory,
-} from '../../../extension/peerd-runtime/tools/metadata-registry.js';
+  registerTool,
+} from '../../../extension/tests/helpers/tool-dispatch-fixture.js';
 
 const tool = (over: Record<string, unknown> = {}) => ({
   name: 'phase_tool', description: 'phase tool', primitive: 'web', sideEffect: 'read',

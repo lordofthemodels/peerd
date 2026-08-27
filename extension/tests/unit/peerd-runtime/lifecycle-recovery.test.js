@@ -10,9 +10,11 @@
 import { describe, it, expect } from '../../framework.js';
 import {
   makeLifecycleBoot, makeDispatchTracker, retryClassForTool,
-  registerTool, clearTools, dispatchToolCall,
   OPERATION_STATES, groupResourceLossNotices,
 } from '/peerd-runtime/index.js';
+import {
+  clearTools, dispatchToolCall, registerTool,
+} from '../../helpers/tool-dispatch-fixture.js';
 
 const S = OPERATION_STATES;
 

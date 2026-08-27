@@ -2074,7 +2074,7 @@ export const createKernelTurnAuthorityAdapter = (deps, semanticOwners) => {
       if (typeof tabId !== 'number' && tabMode !== 'free') {
         return {
           ok: false,
-          error: `${method}: no page open yet — call page.goto(url) first to open your tab.`,
+          error: `${method}: no page open yet - call page.goto(url) first to open your tab.`,
           outcomeKnown: true,
         };
       }

@@ -1,18 +1,10 @@
-// Kernel denylist editor migration: the mutation routes must preserve the
-// legacy Logs-view editor's observable behavior while the network backstop
-// obligation stays live in the kernel.
+// Kernel denylist editor behavior and network-backstop obligation.
 
 import { describe, expect, test } from 'bun:test';
 import {
   createKernelDenylistPolicy,
   makeKernelDenylistRoutes,
 } from '../../extension/background/kernel-denylist-policy.js';
-import { makeDenylistRoutes } from '../../extension/background/routes/denylist.js';
-import { makeDenylistStore } from '../../extension/background/denylist-store.js';
-import {
-  flattenCategorisedDenylist,
-  normalizeDenylistPattern,
-} from '../../extension/peerd-egress/kernel-storage.js';
 
 const seed = {
   categories: { sensitive: ['bank.example', '*.health.example'] },
@@ -40,27 +32,9 @@ const makeKernelLane = ({
   return { routes, audit, kv, networkCustody };
 };
 
-const makeLegacyLane = ({ kv = makeKv() } = {}) => {
-  const audit: any[] = [];
-  const syncs: number[] = [];
-  const store = makeDenylistStore({
-    kv, key: 'denylist.user.v1', normalizePattern: normalizeDenylistPattern,
-  });
-  const ready = store.load(flattenCategorisedDenylist(seed));
-  const routes = makeDenylistRoutes({
-    denylistStore: store,
-    auditLog: { append: async (entry: any) => { audit.push(entry); } },
-    denylistNetGuard: { sync: () => { syncs.push(1); } },
-    getSeedCategories: () => seed.categories,
-  });
-  return { routes, audit, kv, ready, syncs };
-};
-
 describe('kernel denylist mutation routes', () => {
-  test('add and remove replies match the legacy editor exactly', async () => {
+  test('add and remove preserve normalized overlay state and audit', async () => {
     const kernel = makeKernelLane();
-    const legacy = makeLegacyLane();
-    await legacy.ready;
     for (const [route, message] of [
       ['denylist/add', { pattern: ' Private.Example ' }],
       ['denylist/add', { pattern: 'private.example' }],
@@ -70,15 +44,15 @@ describe('kernel denylist mutation routes', () => {
       ['denylist/remove', { pattern: 'never-added.example' }],
       ['denylist/add', { pattern: '' }],
     ] as const) {
-      const kernelReply = await kernel.routes[route](message);
-      const legacyReply = await legacy.routes[route](message);
-      expect(JSON.parse(JSON.stringify(kernelReply))).toEqual(
-        JSON.parse(JSON.stringify(legacyReply)),
-      );
+      await kernel.routes[route](message);
     }
-    expect(kernel.audit).toEqual(legacy.audit);
-    expect(kernel.kv._values.get('denylist.user.v1'))
-      .toEqual(legacy.kv._values.get('denylist.user.v1'));
+    expect(kernel.kv._values.get('denylist.user.v1')).toEqual({
+      added: [], disabled: [],
+    });
+    expect(kernel.audit.map((entry) => entry.type)).toEqual([
+      'denylist_added', 'denylist_added', 'denylist_removed',
+      'denylist_removed', 'denylist_added',
+    ]);
   });
 
   test('a successful edit resyncs the network backstop; a refused one does not', async () => {

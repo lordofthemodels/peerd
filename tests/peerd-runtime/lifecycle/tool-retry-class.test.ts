@@ -1,6 +1,6 @@
 // Tool → retry class: the derivation rules, and §16.1's inventory obligation
 // ("every side-effecting tool has a retry classification") asserted against the
-// REAL authority inventory rather than a hand-copied one — so a new tool
+// REAL authority inventory rather than a hand-copied one - so a new tool
 // that lands without a considered class fails here, not in production recovery.
 
 import { describe, test, expect } from 'bun:test';

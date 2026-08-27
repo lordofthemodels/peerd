@@ -9,7 +9,7 @@
 // carry the thesis; the tail catches conclusions/footers (and proves to the
 // model that content was elided in between).
 //
-// Pure functions, no IO — producers and read_result own the store boundary.
+// Pure functions, no IO - producers and read_result own the store boundary.
 
 // 75/25 head/tail split of the window budget.
 const HEAD_FRACTION = 0.75;
@@ -102,7 +102,7 @@ export const windowText = (text, budget) => {
  */
 export const pagingFooter = ({ key, total, headChars, tailChars }) => [
   `[paging] The full text (${total} chars) is stored locally. You saw the first ${headChars} and last ${tailChars} chars.`,
-  `To read more call read_result with { "key": "${key}", "offset": <char offset>, "limit": <chars, max ${SPILL_PAGE_CHARS}> } — e.g. offset ${headChars} continues where the head stopped.`,
+  `To read more call read_result with { "key": "${key}", "offset": <char offset>, "limit": <chars, max ${SPILL_PAGE_CHARS}> } - e.g. offset ${headChars} continues where the head stopped.`,
 ].join('\n');
 
 /**

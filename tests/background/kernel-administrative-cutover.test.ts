@@ -5,7 +5,6 @@ import { createKernelAdministrativeControl } from '../../extension/background/ke
 import { createKernelSkillPersistence } from '../../extension/background/kernel-skill-persistence.js';
 import { createKernelFeatureControl } from '../../extension/background/kernel-feature-control.js';
 import { makeSemanticControllerClient } from '../../extension/background/offscreen-controller-client.js';
-import { makeKernelSkillInstallRoutes } from '../../extension/background/kernel-administrative-routes.js';
 import { parseSkillMd } from '../../extension/peerd-runtime/skills/parse.js';
 import { parseHookMarkdown } from '../../extension/peerd-runtime/tools/hooks/compile.js';
 import { scopeId } from '../../extension/peerd-runtime/memory/memory.js';
@@ -131,23 +130,13 @@ describe('sealed administrative root cutover', () => {
       'administrative.hooks.remove',
     ]));
 
-    class SkillExistsError extends Error {}
-    class SkillParseError extends Error {}
-    class SkillInstallError extends Error {}
-    const legacy = makeKernelSkillInstallRoutes({
-      skillRegistry: { install: async (text: string) => ({ name: parseSkillMd(text).name }) },
-      canWrite: () => {}, pushState: () => {}, REMOTE_SKILL_INSTALL: false,
-      installFromLocal: ({ registry }: any, { text }: any) => registry.install(text),
-      installFromGit: async () => {}, installFromManifest: async () => {},
-      SkillExistsError, SkillParseError, SkillInstallError,
-    });
     expect(await control.routes['skills/installGit']({ url: 'https://example.test' }))
-      .toEqual(await legacy['skills/installGit']({ url: 'https://example.test' }));
+      .toEqual({ ok: false, error: 'remote-install-disabled' });
     const skill = [
       '---', 'name: skill-one', 'description: One skill', '---', '', '# One', 'Body.',
     ].join('\n');
     expect(await control.routes['skills/installLocal']({ text: skill }))
-      .toMatchObject(await legacy['skills/installLocal']({ text: skill }));
+      .toMatchObject({ ok: true, skill: { name: 'skill-one' } });
   });
 
   test('keeps write refusals known and storage loss after dispatch unknown', async () => {

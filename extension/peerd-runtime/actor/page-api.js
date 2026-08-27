@@ -12,8 +12,8 @@
 // unchanged. This is a vocabulary + shape layer over those — the same posture as
 // the page_* facade (#109), but exposed as a CODE surface the actor drives in a
 // REPL rather than as discrete tool definitions. The imperative shell (the worker
-// `page` surface + the SW route that runs each call through `dispatchToolCall`)
-// lives elsewhere; keeping the translation pure makes the semantics — above all
+// `page` surface + the named, run-bound page authority operation) lives
+// elsewhere; keeping the translation pure makes the semantics - above all
 // Playwright's LOCATOR STRICTNESS — unit-testable without a browser.
 
 import { codeClientMethod, codeClientMethods } from './capability-manifest.js';

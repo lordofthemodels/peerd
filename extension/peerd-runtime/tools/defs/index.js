@@ -66,9 +66,8 @@ export {
 };
 
 /**
- * Ordered semantic inventory for universal consumers and tests. The temporary
- * service-worker lane imports only tools/legacy-implementations.js so a moved
- * tool cannot remain executable through this broad catalog barrel.
+ * Ordered semantic inventory for controller and isolated-actor consumers.
+ * The authority kernel never imports this broad semantic barrel.
  */
 export const BUILTIN_TOOLS = Object.freeze([
   // inspect (one kind-discriminated tool: provider_config | storage |

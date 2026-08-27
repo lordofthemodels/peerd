@@ -1,19 +1,11 @@
-// Kernel skills metadata authority: must preserve the legacy registry
-// routes' observable behavior (replies, stored rows, audit) without parsing
-// or installing a skill. Both lanes run against the same fake-indexeddb
-// database, matching production where they share `peerd-skills`.
+// Kernel skills metadata authority: replies, stored rows, and audit remain
+// stable without retaining the superseded route implementation.
 
 import { describe, expect, test } from 'bun:test';
 import { useFakeIndexedDB } from '../setup.ts';
 import { createKernelSkillsAuthority } from '../../extension/background/kernel-skills-authority.js';
 import { createSkillStore } from '../../extension/peerd-runtime/skills/store.js';
 import { createSkillRegistry } from '../../extension/peerd-runtime/skills/registry.js';
-import { makeSkillsRoutes } from '../../extension/background/routes/skills.js';
-import {
-  SkillExistsError,
-  SkillNotFoundError,
-} from '../../extension/peerd-runtime/skills/registry.js';
-import { SkillParseError } from '../../extension/peerd-runtime/skills/parse.js';
 
 await useFakeIndexedDB();
 
@@ -25,7 +17,7 @@ const SKILL_MD = (name: string) => [
 let dbSequence = 0;
 const makeLanes = async () => {
   // A fresh database name per test keeps fake-indexeddb state isolated while
-  // both lanes still share ONE database, as in production.
+  // each authority receives isolated durable state.
   const dbName = `peerd-skills-test-${++dbSequence}`;
   const factory: IDBFactory = new Proxy(indexedDB, {
     get(target, property, receiver) {
@@ -36,22 +28,8 @@ const makeLanes = async () => {
       return typeof value === 'function' ? value.bind(target) : value;
     },
   });
-  const legacyAudit: any[] = [];
   const store = createSkillStore({ idbFactory: factory });
-  const registry = createSkillRegistry({
-    store, audit: async (entry: any) => { legacyAudit.push(entry); },
-  });
-  const legacyPushes: number[] = [];
-  const legacy = makeSkillsRoutes({
-    skillRegistry: registry,
-    pushState: () => { legacyPushes.push(1); },
-    REMOTE_SKILL_INSTALL: false,
-    installFromLocal: async () => { throw new Error('unused'); },
-    installFromGit: async () => { throw new Error('unused'); },
-    installFromManifest: async () => { throw new Error('unused'); },
-    SkillExistsError, SkillParseError,
-    SkillInstallError: Error,
-  });
+  const registry = createSkillRegistry({ store });
   const kernelAudit: any[] = [];
   const kernelPushes: number[] = [];
   const kernel = createKernelSkillsAuthority({
@@ -61,20 +39,18 @@ const makeLanes = async () => {
   });
   const install = (name: string) => registry.install(SKILL_MD(name), { source: 'local' });
   return {
-    legacy, kernel, install,
-    legacyAudit, kernelAudit, legacyPushes, kernelPushes,
+    kernel, install, kernelAudit, kernelPushes,
     readBody: (name: string) => store.getBody(name),
   };
 };
 
 describe('kernel skills metadata authority', () => {
-  test('list matches the legacy reply, sorted, metadata only', async () => {
+  test('list is sorted and contains metadata only', async () => {
     const lanes = await makeLanes();
     await lanes.install('zeta');
     await lanes.install('alpha');
     const kernelReply = await lanes.kernel.routes['skills/list']();
-    const legacyReply = await lanes.legacy['skills/list']();
-    expect(kernelReply).toEqual(legacyReply);
+    expect(kernelReply.ok).toBe(true);
     expect(kernelReply.skills.map((skill: any) => skill.name)).toEqual(['alpha', 'zeta']);
     expect(JSON.stringify(kernelReply)).not.toContain('Do the thing');
   });
@@ -89,23 +65,18 @@ describe('kernel skills metadata authority', () => {
     });
     expect(kernelReply).toMatchObject({ ok: true, skill: { id: 'alpha', enabled: false } });
     expect(await lanes.readBody('alpha')).toBe(bodyBefore);
-    const legacyReply = await lanes.legacy['skills/setEnabled']({
-      name: 'alpha', enabled: true,
-    });
-    expect(legacyReply).toMatchObject({ ok: true, skill: { id: 'alpha', enabled: true } });
-    expect(kernelReply.skill).toEqual({ ...legacyReply.skill, enabled: false });
     expect(lanes.kernelPushes).toHaveLength(1);
   });
 
-  test('missing-name and unknown-skill replies match the legacy editor', async () => {
+  test('missing-name and unknown-skill replies are stable', async () => {
     const lanes = await makeLanes();
     for (const route of ['skills/setEnabled', 'skills/remove'] as const) {
-      expect(await lanes.kernel.routes[route]({})).toEqual(await lanes.legacy[route]({}));
+      expect(await lanes.kernel.routes[route]({})).toEqual({ ok: false, error: 'name-required' });
     }
     expect(await lanes.kernel.routes['skills/setEnabled']({ name: 'ghost', enabled: true }))
-      .toEqual(await lanes.legacy['skills/setEnabled']({ name: 'ghost', enabled: true }));
+      .toEqual({ ok: false, error: "no skill named 'ghost'" });
     expect(await lanes.kernel.routes['skills/remove']({ name: 'ghost' }))
-      .toEqual(await lanes.legacy['skills/remove']({ name: 'ghost' }));
+      .toEqual({ ok: true, removed: false });
   });
 
   test('remove deletes meta and body, audits once, and is idempotent', async () => {
