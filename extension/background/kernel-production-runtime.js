@@ -1,7 +1,7 @@
 // @ts-check
 
 import { CHANNEL_DEFAULTS } from '/shared/channel-config.js';
-import { createKernelDwebRouteRuntime } from './kernel-dweb-route-runtime.js';
+import { createKernelDwebRouteOwner } from './kernel-dweb-route-runtime.js';
 import { createKernelRichRuntime } from './kernel-rich-runtime.js';
 
 const REASONING_EFFORT_LEVELS = Object.freeze(['low', 'medium', 'high', 'xhigh', 'max']);
@@ -161,13 +161,13 @@ export const createKernelProductionRuntime = async (deps) => {
         await import('./kernel-turn-live-factories.js');
       return createKernelTurnLiveFactories({ ...deps, engine: sharedEngine });
     },
-    createDwebRoutes: deps.dwebEnabled ? async (
+    createDwebOwner: deps.dwebEnabled ? async (
       /** @type {{engine:Record<string,any>,relays:Record<string,any>,transferLive:Record<string,any>}} */
       { engine: sharedEngine, relays, transferLive },
     ) => {
       const dweb = await deps.getDwebLive?.();
       if (!dweb?.withIdentityMutation) throw new Error('kernel-dweb-live-unavailable');
-      return createKernelDwebRouteRuntime({
+      return createKernelDwebRouteOwner({
         enabled: true,
         engine: sharedEngine,
         relays,
