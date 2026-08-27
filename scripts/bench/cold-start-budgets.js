@@ -125,16 +125,20 @@ export const COLD_SOURCE_TARGETS = Object.freeze({
 });
 
 export const PREVIEW_KERNEL_SOURCE_CONTRACT = Object.freeze({
-  shared: Object.freeze({ modules: 94, graphBytes: 678_376 }),
-  target: Object.freeze({ modules: 97, graphBytes: 728_153 }),
+  shared: Object.freeze({ modules: 77, graphBytes: 541_791 }),
+  target: Object.freeze({ modules: 81, graphBytes: 620_378 }),
   // Preview alone owns the bounded consent snapshot and durable settlement
-  // receipt; pin that reviewed authority cost instead of hiding it in semantics.
-  exclusive: Object.freeze({ modules: 3, graphBytes: 66_255 }),
+  // receipt. The target-neutral owner is a separate module so Firefox can load
+  // the identical feature on demand without importing Preview update/dweb code.
+  exclusive: Object.freeze({ modules: 4, graphBytes: 78_587 }),
   entryBytesCeiling: 78,
   directImportsCeiling: 2,
 });
 export const FIREFOX_KERNEL_SOURCE_CONTRACT = Object.freeze({
-  modules: 108, graphBytes: 862_165, entryBytes: 78, directImports: 2,
+  modules: 80, graphBytes: 568_695, entryBytes: 78, directImports: 2,
+});
+export const PREVIEW_FIREFOX_KERNEL_SOURCE_CONTRACT = Object.freeze({
+  modules: 81, graphBytes: 574_061, entryBytes: 90, directImports: 2,
 });
 
 // The offscreen entry is a broker/supervisor, not a feature host. Its former
