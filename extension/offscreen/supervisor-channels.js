@@ -60,7 +60,8 @@ export const admitLocalModelChannelOffer = (event, workerUrl, ownsLease) => {
  *   loadControllerBootstrap:()=>Promise<any>,
  *   loadRepositoryHost?:()=>Promise<any>,
  *   loadLocalModelHost?:()=>Promise<any>,
- *   loadContributorHost?:()=>Promise<any>,
+ *   loadContributorHost?:(()=>Promise<any>)|null,
+ *   loadContributorOffer?:(()=>Promise<(value:unknown)=>any>)|null,
  *   loadArtifactHost?:()=>Promise<any>,
  *   loadActorHost?:()=>Promise<any>,
  *   actorPorts?:Set<MessagePort>,
@@ -73,7 +74,8 @@ export const createServiceWorkerChannels = ({
   getFeatureLeaseHost, loadControllerBootstrap,
   loadRepositoryHost = () => import('./repository-host.js'),
   loadLocalModelHost = () => import('./local-model.js'),
-  loadContributorHost = () => import('./semantic-routes/contributor.js'),
+  loadContributorHost = null,
+  loadContributorOffer = null,
   loadArtifactHost = () => import('./artifact-host.js'),
   loadActorHost = () => Promise.all([
     import('./actor-channel-host.js'), import('./actor-runner.js'),
@@ -94,12 +96,12 @@ export const createServiceWorkerChannels = ({
   const loadController = bounded(loadControllerBootstrap, 'controller-host');
   const loadRepository = bounded(loadRepositoryHost, 'repository-host');
   const loadLocalModel = bounded(loadLocalModelHost, 'local-model-host');
-  const loadContributor = bounded(loadContributorHost, 'contributor-host');
+  const loadContributor = typeof loadContributorHost === 'function'
+    ? bounded(loadContributorHost, 'contributor-host') : null;
+  const loadContributorParser = typeof loadContributorOffer === 'function'
+    ? bounded(loadContributorOffer, 'contributor-offer') : null;
   const loadArtifact = bounded(loadArtifactHost, 'artifact-host');
   const loadActor = bounded(loadActorHost, 'actor-host');
-  const loadContributorOffer = makeBoundedModuleLoader(
-    () => import('../shared/contributor-channel.js').then((module) => module.parseContributorOffer),
-  );
   // Chrome actor jobs arrive over a standard MessageChannel transferred by the
   // service worker directly to this exact offscreen WindowClient. This avoids
   // runtime messaging and runtime Port fan-out to other extension frames.
@@ -266,7 +268,11 @@ export const createServiceWorkerChannels = ({
     }
     if (event.data?.type === 'peerd/contributor-channel') {
       const port = event.ports?.[0];
-      loadContributorOffer().then((parseContributorOffer) => {
+      if (!loadContributorParser || !loadContributor) {
+        try { port?.close(); } catch {}
+        return;
+      }
+      loadContributorParser().then((parseContributorOffer) => {
         const contributorOffer = parseContributorOffer(event.data);
         const source = /** @type {{scriptURL?:unknown}|null} */ (event.source ?? null);
         const admitted = event.isTrusted === true && source?.scriptURL === backgroundScriptUrl
