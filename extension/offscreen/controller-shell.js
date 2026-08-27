@@ -664,6 +664,7 @@ export const makeControllerOfferHandler = ({
   newId = () => crypto.randomUUID(),
 }) => {
   const retiredEpochs = new Set();
+  const releasedChannels = new WeakSet();
   /** @type {{ epoch: string, kernelIdentity?:unknown, close: () => void } | null} */
   let active = null;
   const handleOffer = (/** @type {MessageEvent} */ event) => {
@@ -697,7 +698,7 @@ export const makeControllerOfferHandler = ({
       retiredEpochs.add(active.epoch);
       active.close();
     }
-    active = bindControllerChannel({
+    const channel = bindControllerChannel({
       port: event.ports[0],
       channelId: data.channelId,
       buildDigest: data.buildDigest,
@@ -708,15 +709,28 @@ export const makeControllerOfferHandler = ({
       supportedCaps,
       loadController,
       onClose: () => {
-        retiredEpochs.add(data.kernelEpoch);
-        if (active?.epoch === data.kernelEpoch) active = null;
+        if (!releasedChannels.has(channel)) retiredEpochs.add(data.kernelEpoch);
+        if (active === channel) active = null;
       },
     });
+    active = channel;
     return true;
   };
+  // Releasing an exact feature lease closes its channel and Worker, but the
+  // same live kernel epoch may acquire a later exact lease. The supervisor's
+  // lease check fences stale offers before they reach this handler.
+  handleOffer.release = () => {
+    if (!active) {
+      loadController.close?.();
+      return;
+    }
+    const prior = active;
+    active = null;
+    releasedChannels.add(prior);
+    prior.close();
+  };
   // A feature-lease revocation must retire the exact controller epoch and its
-  // sealed Worker rather than merely dropping the keepalive transport. A late
-  // offer from that kernel generation then remains permanently fenced.
+  // sealed Worker rather than merely dropping the keepalive transport.
   handleOffer.close = () => {
     if (!active) {
       loadController.close?.();
