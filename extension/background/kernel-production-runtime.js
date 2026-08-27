@@ -88,6 +88,11 @@ export const createKernelProductionRuntime = async (deps) => {
       deps.firefoxActorLifetime ? deps.firefoxActorLifetime.run(operation, options) : operation(),
     ensureOffscreen: deps.featureHost.ensureOffscreen,
     retireHost: (/** @type {string} */ reason) => deps.featureHost.runtime.retireActiveHost(reason),
+    ensureHostRetirement: () => deps.featureHost.runtime.ensureHostRetirement(),
+    armHostRetirement: (/** @type {string} */ hostEpoch) =>
+      deps.featureHost.runtime.armHostRetirement(hostEpoch),
+    disarmHostRetirement: (/** @type {string} */ hostEpoch) =>
+      deps.featureHost.runtime.disarmHostRetirement(hostEpoch),
   };
   const transfer = {
     idb: deps.idb,
