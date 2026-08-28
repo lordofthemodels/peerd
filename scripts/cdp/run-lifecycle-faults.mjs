@@ -186,7 +186,7 @@ ${anchor}`, 'source exact script effect');
 };
 
 export const injectLifecycleFaultJob = (input) => {
-  const anchor = 'const _runJob = async ({ code, timeoutMs = 30000, startedAt, deadlineAt, a2a = false, actors = false, siteFetch = \'\', caps, ownerSessionId, ownerToolUseId, runId, pageProgramSemanticToken, workspaceSessionId, workspaceBudgetBytes = WORKSPACE_BUDGET_BYTES }, { sendToSW, extractMarkdown, opfsForRoot = opfsHelpers }) => {';
+  const anchor = 'const _runJob = async ({ code, timeoutMs = 30000, startedAt, deadlineAt, a2a = false, actors = false, siteFetch = \'\', caps, ownerSessionId, ownerToolUseId, runId, pageProgramSemanticToken, appProgramSemanticToken, workspaceSessionId, workspaceBudgetBytes = WORKSPACE_BUDGET_BYTES }, { sendToSW, extractMarkdown, opfsForRoot = opfsHelpers }) => {';
   return replaceExact(input, anchor, `${anchor}
   if (code === ${JSON.stringify(FAULT_CODE)}) {
     const recorded = await sendToSW('lifecycle-fault/dispatch', {
@@ -204,10 +204,10 @@ export const injectLifecycleFaultJob = (input) => {
 export const assertLifecycleFaultExecutionSeam = ({ tracking, controller, bridge, authority }) => {
   const canaries = [
     [tracking, 'await operationLog.markDispatched(operationId);'],
-    [controller, "rpc('turn.tool.prepare', {"],
-    [controller, "rpc('turn.execution.run-script', { ...binding, ...scriptRequest })"],
-    [controller, "rpc('turn.tool.settle', {"],
+    [controller, "rpc('turn.execution.run-script', { ...binding(), ...scriptRequest })"],
+    [controller, "await rpc('turn.finalize', {});"],
     [bridge, "case 'turn.execution.run-script':"],
+    [bridge, "case 'turn.finalize':"],
     [authority, 'const result = await client.execHeadless(code, opts);'],
   ];
   if (canaries.some(([source, canary]) => source.split(canary).length !== 2)) {
@@ -480,7 +480,7 @@ const main = async (target = SOURCE_TARGET) => {
       throw new Error(`real controller Class E effect did not cross the offscreen job host; state: ${JSON.stringify(faultState)}; controller diagnostics: ${JSON.stringify(modelWire.diagnostics)}; model requests: ${JSON.stringify(modelWire.requests)}`);
     }
     const { operationId, sessionId } = inFlight;
-    assert(true, 'model-issued Class E tool crossed controller prepare and exact effect authority');
+    assert(true, 'model-issued Class E tool crossed sealed semantic dispatch and exact effect authority');
     await modelWire.detach().catch(() => {});
 
     stage = 'physical browser termination';
