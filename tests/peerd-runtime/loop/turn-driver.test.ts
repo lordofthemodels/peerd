@@ -319,24 +319,20 @@ const turnDeps = (kind: 'chat' | 'actor' | 'spawned', {
         // old fixture ran the raw loop in the SW shell, bypassing the
         // controller-owned tool executor it was meant to cover.
         await ctx.getSystemPrompt();
-        const firstTools = await ctx.refreshTools();
+        const firstSurface = await ctx.refreshTools();
+        const firstTools = Array.isArray(firstSurface) ? firstSurface : firstSurface.tools;
         await ctx.getSystemPrompt();
         modelCalls.push({ tools: firstTools });
-        const descriptor = firstTools.find((tool: any) => tool.name === 'message_actor');
-        const prepared = await ctx.toolExecution.prepare({
-          id: 'actor-tool', name: 'message_actor', args: { to: 'web', message: 'work' },
-        }, { authorityClass: 'actor', descriptor });
-        if (prepared?.mode !== 'execute') throw new Error('tool preparation did not enter custody');
+        // The real bridge claims the exact actor operation before invoking
+        // this private loader. This fixture mirrors that lazy host boundary;
+        // it must not resurrect the deleted SW tool-execution abstraction.
+        await ctx.loadAuthorityContext();
         actorIsolation = {
           status: 'temporarily_unavailable', host: 'background-page-worker',
           reason: 'worker startup failed', retryable: true,
         };
-        await ctx.toolExecution.settle(prepared.custody, {
-          protocol: 1, executionId: 'actor-execution', argsDigest: 'a'.repeat(64),
-          ok: true, outcomeKnown: true, effectEntered: true,
-          value: { ok: false, error: 'actor worker unavailable' },
-        });
-        const nextTools = await ctx.refreshTools();
+        const nextSurface = await ctx.refreshTools();
+        const nextTools = Array.isArray(nextSurface) ? nextSurface : nextSurface.tools;
         await ctx.getSystemPrompt();
         modelCalls.push({ tools: nextTools });
         yield { type: 'stop', sessionId: 's1', stopReason: 'end_turn' };
@@ -344,21 +340,17 @@ const turnDeps = (kind: 'chat' | 'actor' | 'spawned', {
       : async function* (ctx: any) {
       loopCtx = ctx;
       if (goalControl) {
-        const prepared = await ctx.toolExecution.prepare({
-          id: 'goal-call', name: 'complete_goal', args: { summary: 'done' },
-        }, { authorityClass: 'local' });
+        // The controller owns goal tool semantics; the host bridge lazily
+        // hydrates only the exact local authority after admitting goal.end.
+        const authority = await ctx.loadAuthorityContext();
         goalEffect = {
           ok: true,
           outcomeKnown: true,
           value: {
-            ended: prepared.custody.ctx.completeGoalRun('done') === true,
+            ended: authority.completeGoalRun('done') === true,
           },
         };
-        await ctx.toolExecution.settle(prepared.custody, {
-          protocol: 1, executionId: 'goal-execution', argsDigest: 'a'.repeat(64),
-          ok: true, outcomeKnown: true, effectEntered: true,
-          value: { ok: true, content: 'Goal run ended. Summary: done' },
-        });
+        goalSettled = { ok: true, content: 'Goal run ended. Summary: done' };
         yield { type: 'stop', sessionId: 's1', stopReason: 'end_turn' };
         return;
       }
@@ -484,10 +476,11 @@ describe('runAgentTurn credential custody', () => {
     const fixture = turnDeps('chat', { dynamicIsolation: true });
     expect(await fixture.driver.runAgentTurn({ sessionId: 's1', userText: 'delegate work' }))
       .toEqual({ ok: true, stopReason: 'end_turn' });
-    expect(fixture.modelCalls).toHaveLength(2);
-    expect(fixture.modelCalls[0].tools.map((tool: any) => tool.name))
+    const projectedCalls = fixture.modelCalls.filter((call) => Array.isArray(call.tools));
+    expect(projectedCalls).toHaveLength(2);
+    expect(projectedCalls[0].tools.map((tool: any) => tool.name))
       .toEqual(['message_actor', 'actor_create', 'actor_list']);
-    expect(fixture.modelCalls[1].tools.map((tool: any) => tool.name)).toEqual(['actor_list']);
+    expect(projectedCalls[1].tools.map((tool: any) => tool.name)).toEqual(['actor_list']);
     // The loop seeds the model contract, refreshes it before step one, then
     // refreshes again after the effect. The controller sees the live bounded
     // projection on every render; authority no longer shapes the prompt text.
